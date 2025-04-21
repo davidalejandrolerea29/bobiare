@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -6,50 +6,55 @@ import { RootStackParamList } from '../types/types';
 
 type ThankYouRouteProp = RouteProp<RootStackParamList, 'ThankYou'>;
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Catalog'>;
-export default function ThankYouScreen() {
 
+export default function ThankYouScreen() {
   const route = useRoute<ThankYouRouteProp>();
   const { orderDetails } = route.params;
+  const navigation = useNavigation<NavigationProp>();
 
   const returnToCatalog = () => {
-    const navigation = useNavigation<NavigationProp>();
-  navigation.navigate('Catalog');
+    navigation.navigate('Catalog');
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>¡Gracias por tu compra!</Text>
-      <Text style={styles.message}>
-        Tu pedido ha sido procesado con éxito. Recibirás un correo electrónico con los detalles de tu compra.
-      </Text>
+    <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <View style={styles.container}>
+        <Text style={styles.title}>¡Gracias por tu compra!</Text>
+        <Text style={styles.message}>
+          Tu pedido ha sido procesado con éxito. Recibirás un correo electrónico con los detalles de tu compra.
+        </Text>
 
-      <View style={styles.orderSummary}>
-        <Text style={styles.summaryTitle}>Resumen del Pedido</Text>
-        <Text style={styles.orderNumber}>Orden #{Math.random().toString(36).substr(2, 9)}</Text>
-        <Text style={styles.email}>Email: {orderDetails.email}</Text>
-        <Text style={styles.total}>Total: €{orderDetails.total.toFixed(2)}</Text>
+        <View style={styles.orderSummary}>
+          <Text style={styles.summaryTitle}>Resumen del Pedido</Text>
+          <Text style={styles.orderNumber}>Orden #{Math.random().toString(36).substr(2, 9)}</Text>
+          <Text style={styles.email}>Email: {orderDetails.email}</Text>
+          <Text style={styles.total}>Total: ${orderDetails.total.toFixed(2)}</Text>
+        </View>
+
+        <View style={styles.instructionsContainer}>
+          <Text style={styles.instructionsTitle}>Próximos Pasos:</Text>
+          <Text style={styles.instruction}>1. Empaqueta tu producto de forma segura</Text>
+          <Text style={styles.instruction}>2. Llévalo a nuestra dirección</Text>
+          <Text style={styles.instruction}>3. Te notificaremos cuando lo recibamos</Text>
+          <Text style={styles.instruction}>4. Te mantendremos informado del progreso</Text>
+        </View>
+
+        <TouchableOpacity style={styles.button} onPress={returnToCatalog}>
+          <Text style={styles.buttonText}>Volver al Catálogo</Text>
+        </TouchableOpacity>
       </View>
-
-      <View style={styles.instructionsContainer}>
-        <Text style={styles.instructionsTitle}>Próximos Pasos:</Text>
-        <Text style={styles.instruction}>1. Empaqueta tu producto de forma segura</Text>
-        <Text style={styles.instruction}>2. Llévalo a nuestra dirección</Text>
-        <Text style={styles.instruction}>3. Te notificaremos cuando lo recibamos</Text>
-        <Text style={styles.instruction}>4. Te mantendremos informado del progreso</Text>
-      </View>
-
-      <TouchableOpacity style={styles.button} onPress={returnToCatalog}>
-        <Text style={styles.buttonText}>Volver al Catálogo</Text>
-      </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
+  scrollContainer: {
     padding: 20,
+    backgroundColor: '#f5f5f5',
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  container: {
     alignItems: 'center',
   },
   title: {

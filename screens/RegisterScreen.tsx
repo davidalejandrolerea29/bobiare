@@ -1,22 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { RootStackParamList } from '../types/types';
-import { NavigationProp } from '@react-navigation/native';
-import Toast from 'react-native-toast-message';
-import axios from 'axios';
-
-type Props = {
-  navigation: NavigationProp<RootStackParamList, 'Register'>;
-};
+import { KeyboardAvoidingView, Platform, ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import Toast from '../utils/notify';
+import { AppBackground } from '../components/GlassUI';
+import { colors, shadow } from '../theme';
+import { getErrorMessage, register } from '../utils/api';
 
 export default function RegisterScreen({ navigation }: any) {
 
-  const API_URL = 'https://lightpink-guanaco-543467.hostingersite.com/api/v1';
   const [name, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   const clearFields = () => {
     setEmail('');
@@ -26,129 +20,133 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   const handleRegister = async () => {
-    console.log('Botón de registro presionado');
     if (!email || !password || !name || !confirmPassword) {
       Toast.show({ type: 'error', text1: 'Por favor complete todos los campos' });
       return;
     }
-    console.log('aca paso la validacion de confirm password');
     if (password !== confirmPassword) {
       Toast.show({ type: 'error', text1: 'Las contraseñas no coinciden' });
       return;
     }
 
     try {
-        await axios.post(`${API_URL}/auth/register`, {
-            name,
-            email,
-            password,
-          }, {
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-          });
-          
-      console.log('aca paso la validacion en el backend');
-      Toast.show({ type: 'success', text1: 'Registro exitoso' });
+      await register(name.trim(), email.trim().toLowerCase(), password);
+      Toast.show({
+        type: 'success',
+        text1: 'Cuenta creada. Ya podés iniciar sesión.',
+        autoHide: true,
+        visibilityTime: 3000,
+        onPress: () => Toast.hide(),
+      });
       clearFields();
-    } catch (error: any) {
-        if (axios.isAxiosError(error)) {
-          console.log('Axios error message:', error.message);
-          console.log('Axios error response:', error.response);
-          console.log('Axios error request:', error.request);
-        } else {
-          console.log('Error inesperado:', error);
-        }
-      
-        const msg = error.response?.data?.error || 'Error al registrarse';
-        Toast.show({
-          type: 'error',
-          text1:
-            typeof msg === 'string'
-              ? msg
-              : Object.values(msg as { [key: string]: string[] })[0][0],
-        });
-      }
-      
+      navigation.navigate('Login');
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'No se pudo crear la cuenta',
+        text2: getErrorMessage(error, 'El servidor no devolvió detalles.'),
+        visibilityTime: 5000,
+      });
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Crear Cuenta</Text>
+    <AppBackground>
+      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.heading}>
+            <Text style={styles.eyebrow}>EMPEZÁ CON BOBIARE</Text><Text style={styles.title}>Crear una cuenta</Text><Text style={styles.subtitle}>Cotizá y seguí tus trabajos desde un solo lugar.</Text>
+          </View>
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre completo"
-          value={name}
-          onChangeText={setNombre}
-        />
+          <View style={styles.form}>
+            <TextInput
+              style={styles.input}
+              placeholder="Nombre completo"
+              value={name}
+              onChangeText={setNombre}
+              returnKeyType="next"
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Correo electrónico"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="Correo electrónico"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              returnKeyType="next"
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="Contraseña"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              returnKeyType="next"
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Confirmar contraseña"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="Confirmar contraseña"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              returnKeyType="done"
+              onSubmitEditing={handleRegister}
+            />
 
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>Registrarse</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={handleRegister}>
+              <Text style={styles.buttonText}>Crear cuenta</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.linkText}>¿Ya tienes cuenta? Inicia sesión</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+            <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.linkText}>¿Ya tenés cuenta? Iniciá sesión</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  keyboard: {
     flex: 1,
-    backgroundColor: '#fff',
+  },
+  container: {
+    flexGrow: 1,
+    backgroundColor: 'transparent',
     padding: 20,
     justifyContent: 'center',
+    paddingVertical: 34,
   },
+  heading: { flexShrink: 0 },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#007aff',
-    marginBottom: 40,
+    color: colors.ink,
+    marginBottom: 4,
     textAlign: 'center',
   },
   form: {
     gap: 16,
+    marginTop: 22, padding: 20, borderRadius: 24, backgroundColor: 'rgba(255,255,255,.72)', borderWidth: 1, borderColor: '#fff', ...shadow,
   },
   input: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'rgba(255,255,255,.78)',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 16, borderWidth: 1, borderColor: '#fff',
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#007aff',
+    backgroundColor: colors.primary,
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 17,
     alignItems: 'center',
   },
   buttonText: {
@@ -161,7 +159,9 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   linkText: {
-    color: '#007aff',
+    color: colors.primary,
     fontSize: 14,
   },
+  eyebrow: { color: colors.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1.4, textAlign: 'center' },
+  subtitle: { color: colors.muted, textAlign: 'center', lineHeight: 20 },
 });

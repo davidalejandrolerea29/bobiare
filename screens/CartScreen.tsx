@@ -1,165 +1,69 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { useState, useEffect } from 'react';
-import { RootStackParamList } from '../types/types';
-import { CartItem } from '../types/types';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import type { RouteProp } from '@react-navigation/native';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import Toast from '../utils/notify';
+import { Cart, RootStackParamList } from '../types/types';
+import { AppBackground } from '../components/GlassUI';
+import { colors, formatPrice, shadow } from '../theme';
+import { getCart, getErrorMessage, removeCartItem } from '../utils/api';
 
-// Tipos de navegación y ruta
-type CartScreenRouteProp = RouteProp<RootStackParamList, 'Cart'>;
-type NavigationProp = StackNavigationProp<RootStackParamList, 'Cart'>;
+type Navigation = StackNavigationProp<RootStackParamList, 'Cart'>;
 
 export default function CartScreen() {
-  const route = useRoute<CartScreenRouteProp>();
-  const navigation = useNavigation<NavigationProp>();
+  const navigation = useNavigation<Navigation>();
+  const [cart, setCart] = useState<Cart | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [removing, setRemoving] = useState<number | null>(null);
 
-  const { cartItems: initialCartItems } = route.params;
+  const load = useCallback(async (refresh = false) => {
+    refresh ? setRefreshing(true) : setLoading(true);
+    try {
+      setCart(await getCart());
+    } catch (error) {
+      Toast.show({ type: 'error', text1: getErrorMessage(error, 'No se pudo cargar el carrito') });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-  const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems);
-  const [total, setTotal] = useState(0);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  useEffect(() => {
-    const newTotal = cartItems.reduce((sum, item) => {
-      return item.selectedService ? sum + item.selectedService.price : sum;
-    }, 0);
-    setTotal(newTotal);
-  }, [cartItems]);
-
-  const removeFromCart = (index: number) => {
-    const newCart = cartItems.filter((_, i) => i !== index);
-    setCartItems(newCart);
+  const remove = async (id: number) => {
+    setRemoving(id);
+    try {
+      await removeCartItem(id);
+      await load();
+      Toast.show({ type: 'success', text1: 'Producto eliminado' });
+    } catch (error) {
+      Toast.show({ type: 'error', text1: getErrorMessage(error, 'No se pudo eliminar el producto') });
+    } finally {
+      setRemoving(null);
+    }
   };
+  const goBack = () => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Catalog');
 
-  const proceedToCheckout = () => {
-    navigation.navigate('Checkout', { cartItems, total });
-  };
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Carrito de Compras</Text>
-
-      <ScrollView style={styles.itemsContainer}>
-        {cartItems.length === 0 ? (
-          <Text style={styles.emptyCart}>Tu carrito está vacío</Text>
-        ) : (
-          cartItems.map((item, index) => (
-            <View key={index} style={styles.cartItem}>
-              <Text style={styles.itemName}>{item.name}</Text>
-              {item.selectedService ? (
-                <>
-                  <Text style={styles.serviceName}>{item.selectedService.name}</Text>
-                  <Text style={styles.itemPrice}>${item.selectedService.price.toFixed(2)}</Text>
-                </>
-              ) : (
-                <Text style={styles.serviceName}>Servicio no disponible</Text>
-              )}
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => removeFromCart(index)}
-              >
-                <Text style={styles.removeButtonText}>Eliminar</Text>
-              </TouchableOpacity>
-            </View>
-          ))
-        )}
-      </ScrollView>
-
-      <View style={styles.totalContainer}>
-        <Text style={styles.totalText}>Total: ${total.toFixed(2)}</Text>
-        <TouchableOpacity
-          style={[styles.checkoutButton, cartItems.length === 0 && styles.disabledButton]}
-          onPress={proceedToCheckout}
-          disabled={cartItems.length === 0}
-        >
-          <Text style={styles.checkoutButtonText}>Proceder al Pago</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  return <AppBackground><View style={styles.container}>
+    <View style={styles.header}><TouchableOpacity style={styles.back} onPress={goBack}><Icon name="arrow-left" size={21} color={colors.ink}/></TouchableOpacity><Text style={styles.title}>Tu carrito</Text><View style={styles.back}/></View>
+    {loading ? <ActivityIndicator style={styles.loader} size="large" color={colors.primary}/> :
+      <ScrollView style={styles.itemsContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary}/>}>
+        {!cart?.items.length ? <View style={styles.emptyWrap}><Icon name="cart-outline" size={55} color={colors.muted}/><Text style={styles.emptyCart}>Tu carrito está vacío</Text><TouchableOpacity onPress={() => navigation.navigate('Catalog')}><Text style={styles.catalogLink}>Explorar el catálogo</Text></TouchableOpacity></View> :
+          cart.items.map(item => <View key={item.id} style={styles.cartItem}>
+            <View style={styles.itemIcon}><Icon name="package-variant" size={25} color={colors.primary}/></View>
+            <View style={styles.itemInfo}><Text style={styles.itemName}>{item.product_name_snapshot}</Text><Text style={styles.serviceName}>{item.delivery_time_snapshot?.description || 'Plazo elegido'} · Cant. {item.quantity}</Text>{item.piece_description && <Text style={styles.piece} numberOfLines={2}>{item.piece_description}</Text>}<Text style={styles.itemPrice}>{formatPrice(item.subtotal)}</Text></View>
+            <TouchableOpacity style={styles.removeButton} onPress={() => remove(item.id)} disabled={removing === item.id}>{removing === item.id ? <ActivityIndicator size="small" color={colors.danger}/> : <Icon name="trash-can-outline" size={19} color={colors.danger}/>}</TouchableOpacity>
+          </View>)}
+      </ScrollView>}
+    <View style={styles.totalContainer}><View><Text style={styles.totalLabel}>TOTAL</Text><Text style={styles.totalText}>{formatPrice(cart?.total || 0)}</Text></View><TouchableOpacity style={[styles.checkoutButton, !cart?.items.length && styles.disabledButton]} onPress={() => navigation.navigate('Checkout')} disabled={!cart?.items.length}><Text style={styles.checkoutButtonText}>Continuar</Text><Icon name="arrow-right" size={20} color="#fff"/></TouchableOpacity></View>
+  </View></AppBackground>;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#2c3e50',
-  },
-  itemsContainer: {
-    flex: 1,
-  },
-  emptyCart: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: '#666',
-    marginTop: 20,
-  },
-  cartItem: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  itemName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  serviceName: {
-    color: '#666',
-    marginBottom: 5,
-  },
-  itemPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 10,
-  },
-  removeButton: {
-    backgroundColor: '#e74c3c',
-    padding: 8,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  removeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  totalContainer: {
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    paddingTop: 20,
-    marginTop: 20,
-  },
-  totalText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#2c3e50',
-  },
-  checkoutButton: {
-    backgroundColor: '#2c3e50',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  checkoutButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  disabledButton: {
-    backgroundColor: '#95a5a6',
-  },
+  container: { flex: 1, backgroundColor: 'transparent', padding: 20 }, header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }, back: { width: 44, height: 44, borderRadius: 15, backgroundColor: 'rgba(255,255,255,.7)', alignItems: 'center', justifyContent: 'center' }, title: { fontSize: 23, fontWeight: '900', color: colors.ink },
+  loader: { flex: 1 }, itemsContainer: { flex: 1 }, emptyWrap: { alignItems: 'center', marginTop: 65 }, emptyCart: { textAlign: 'center', fontSize: 16, color: colors.muted, marginTop: 14 }, catalogLink: { color: colors.primary, fontWeight: '800', marginTop: 10 },
+  cartItem: { backgroundColor: 'rgba(255,255,255,.76)', padding: 15, borderRadius: 22, marginBottom: 15, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#fff', ...shadow }, itemIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(147,197,253,.28)', alignItems: 'center', justifyContent: 'center' }, itemInfo: { flex: 1, marginLeft: 12 }, itemName: { fontSize: 16, fontWeight: '900', color: colors.ink, marginBottom: 5 }, serviceName: { color: colors.muted, fontSize: 12 }, piece: { color: colors.muted, fontSize: 11, fontStyle: 'italic', marginTop: 4 }, itemPrice: { fontSize: 16, fontWeight: 'bold', color: colors.primary, marginTop: 8 }, removeButton: { backgroundColor: 'rgba(184,74,74,.1)', width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  totalContainer: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 20, marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, totalLabel: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: .8 }, totalText: { fontSize: 20, fontWeight: 'bold', color: colors.ink }, checkoutButton: { backgroundColor: colors.primary, paddingVertical: 15, paddingHorizontal: 22, borderRadius: 18, flexDirection: 'row', gap: 8, alignItems: 'center' }, checkoutButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' }, disabledButton: { backgroundColor: '#95a5a6' },
 });

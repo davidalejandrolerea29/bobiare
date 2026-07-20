@@ -73,3 +73,11 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Expo
+.expo
+dist/
+web-build/
+
+# Copia local reversible de los proyectos nativos anteriores a Expo managed
+.native-backup/

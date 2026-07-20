@@ -1,0 +1,60 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getErrorMessage, normalizeDeliveryTime, normalizeProduct, STORAGE_KEYS } from '../utils/api';
+
+beforeEach(() => AsyncStorage.clear());
+
+test('normalizes numeric API values and offer price', () => {
+  const product = normalizeProduct({
+    id: 2,
+    name: 'Restauración de tanque',
+    price: '25000.00',
+    offer_price: '22000.00',
+    images: ['https://example.test/tanque.png'],
+    delivery_times: [{ id: 3, description: 'Express', business_days: 5, extra_cost: '3000.00' }],
+  });
+
+  expect(product.price).toBe(25000);
+  expect(product.offerPrice).toBe(22000);
+  expect(product.deliveryTimes[0].extra_cost).toBe(3000);
+});
+
+test('normalizes delivery time values returned as strings', () => {
+  expect(normalizeDeliveryTime({
+    id: '3',
+    description: 'Express',
+    business_days: '5',
+    extra_cost: '3000.00',
+  })).toEqual({
+    id: 3,
+    description: 'Express',
+    business_days: 5,
+    extra_cost: 3000,
+  });
+});
+
+test('uses isolated persistence keys for JWT and guest cart', () => {
+  expect(STORAGE_KEYS.accessToken).not.toBe(STORAGE_KEYS.guestToken);
+});
+
+test('returns field validation messages sent by the backend', () => {
+  const error = {
+    response: {
+      data: {
+        message: 'The given data was invalid.',
+        errors: {
+          email: ['El correo electrónico ya está registrado.'],
+          password: ['La contraseña debe tener al menos 8 caracteres.'],
+        },
+      },
+    },
+  };
+
+  expect(getErrorMessage(error)).toBe(
+    'El correo electrónico ya está registrado.\nLa contraseña debe tener al menos 8 caracteres.',
+  );
+});
+
+test('returns direct backend error objects', () => {
+  const error = { response: { data: { email: ['El email no es válido.'] } } };
+  expect(getErrorMessage(error)).toBe('El email no es válido.');
+});

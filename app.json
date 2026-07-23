@@ -1,6 +1,7 @@
 {
   "name": "Bobiare",
   "slug": "bobiare",
+  "owner": "n7softwares",
   "version": "1.0.0",
   "scheme": "bobiare",
   "userInterfaceStyle": "light",
@@ -20,13 +21,21 @@
   "ios": {
     "bundleIdentifier": "com.bobiare"
   },
+  "plugins": [
+    "expo-font",
+    "expo-asset",
+    [
+      "expo-image-picker",
+      {
+        "photosPermission": "Bobiare necesita acceder a tus fotos para analizar la pieza.",
+        "cameraPermission": "Bobiare necesita usar la cámara para fotografiar la pieza.",
+        "microphonePermission": false
+      }
+    ]
+  ],
   "extra": {
     "eas": {
       "projectId": "5df60eb5-8be8-4df5-99c8-0334beeeb83d"
     }
-  },
-  "plugins": [
-    "expo-font",
-    "expo-asset"
-  ]
+  }
 }

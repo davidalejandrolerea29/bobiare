@@ -8,6 +8,7 @@ import { Cart, RootStackParamList } from '../types/types';
 import { AppBackground } from '../components/GlassUI';
 import { colors, formatPrice, shadow } from '../theme';
 import { getCart, getErrorMessage, removeCartItem } from '../utils/api';
+import { FadeInView, ListSkeleton } from '../components/MotionUI';
 
 type Navigation = StackNavigationProp<RootStackParamList, 'Cart'>;
 
@@ -48,14 +49,14 @@ export default function CartScreen() {
 
   return <AppBackground><View style={styles.container}>
     <View style={styles.header}><TouchableOpacity style={styles.back} onPress={goBack}><Icon name="arrow-left" size={21} color={colors.ink}/></TouchableOpacity><Text style={styles.title}>Tu carrito</Text><View style={styles.back}/></View>
-    {loading ? <ActivityIndicator style={styles.loader} size="large" color={colors.primary}/> :
+    {loading ? <ListSkeleton rows={3}/> :
       <ScrollView style={styles.itemsContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary}/>}>
         {!cart?.items.length ? <View style={styles.emptyWrap}><Icon name="cart-outline" size={55} color={colors.muted}/><Text style={styles.emptyCart}>Tu carrito está vacío</Text><TouchableOpacity onPress={() => navigation.navigate('Catalog')}><Text style={styles.catalogLink}>Explorar el catálogo</Text></TouchableOpacity></View> :
-          cart.items.map(item => <View key={item.id} style={styles.cartItem}>
+          cart.items.map((item, index) => <FadeInView key={item.id} index={index}><View style={styles.cartItem}>
             <View style={styles.itemIcon}><Icon name="package-variant" size={25} color={colors.primary}/></View>
             <View style={styles.itemInfo}><Text style={styles.itemName}>{item.product_name_snapshot}</Text><Text style={styles.serviceName}>{item.delivery_time_snapshot?.description || 'Plazo elegido'} · Cant. {item.quantity}</Text>{item.piece_description && <Text style={styles.piece} numberOfLines={2}>{item.piece_description}</Text>}<Text style={styles.itemPrice}>{formatPrice(item.subtotal)}</Text></View>
             <TouchableOpacity style={styles.removeButton} onPress={() => remove(item.id)} disabled={removing === item.id}>{removing === item.id ? <ActivityIndicator size="small" color={colors.danger}/> : <Icon name="trash-can-outline" size={19} color={colors.danger}/>}</TouchableOpacity>
-          </View>)}
+          </View></FadeInView>)}
       </ScrollView>}
     <View style={styles.totalContainer}><View><Text style={styles.totalLabel}>TOTAL</Text><Text style={styles.totalText}>{formatPrice(cart?.total || 0)}</Text></View><TouchableOpacity style={[styles.checkoutButton, !cart?.items.length && styles.disabledButton]} onPress={() => navigation.navigate('Checkout')} disabled={!cart?.items.length}><Text style={styles.checkoutButtonText}>Continuar</Text><Icon name="arrow-right" size={20} color="#fff"/></TouchableOpacity></View>
   </View></AppBackground>;

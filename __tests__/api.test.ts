@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getErrorMessage, normalizeDeliveryTime, normalizeProduct, STORAGE_KEYS } from '../utils/api';
+import { getErrorMessage, mergeProductSummaryWithCache, normalizeDeliveryTime, normalizeProduct, STORAGE_KEYS } from '../utils/api';
 
 beforeEach(() => AsyncStorage.clear());
 
@@ -30,6 +30,41 @@ test('normalizes delivery time values returned as strings', () => {
     business_days: 5,
     extra_cost: 3000,
   });
+});
+
+test('extracts business days from the production delivery description', () => {
+  expect(normalizeDeliveryTime({
+    id: 2,
+    description: 'Rápido (7 días hábiles)',
+  }).business_days).toBe(7);
+});
+
+test('accepts category names returned as strings by the product list', () => {
+  expect(normalizeProduct({
+    id: 3,
+    name: 'Restauración',
+    categories: ['Motos'],
+  }).category).toBe('Motos');
+});
+
+test('keeps cached product images while using the latest catalog price', () => {
+  const cached = normalizeProduct({
+    id: 3,
+    name: 'Restauración',
+    price: 8000,
+    images: ['https://example.test/service.jpg'],
+    delivery_times: [{ id: 1, description: 'Rápido', business_days: 7 }],
+  });
+  const product = mergeProductSummaryWithCache({
+    id: 3,
+    name: 'Restauración actualizada',
+    price: 9500,
+    categories: ['Motos'],
+  }, cached);
+
+  expect(product.price).toBe(9500);
+  expect(product.image).toBe('https://example.test/service.jpg');
+  expect(product.deliveryTimes).toHaveLength(1);
 });
 
 test('uses isolated persistence keys for JWT and guest cart', () => {

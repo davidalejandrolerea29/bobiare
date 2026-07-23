@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import Toast from '../utils/notify';
 import { AppBackground } from '../components/GlassUI';
 import { colors, shadow } from '../theme';
 import { getErrorMessage, register } from '../utils/api';
+import { FadeInView, SoftAppear } from '../components/MotionUI';
 
 export default function RegisterScreen({ navigation }: any) {
 
@@ -58,11 +59,11 @@ export default function RegisterScreen({ navigation }: any) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}>
-          <View style={styles.heading}>
+          <SoftAppear style={styles.heading}>
             <Text style={styles.eyebrow}>EMPEZÁ CON BOBIARE</Text><Text style={styles.title}>Crear una cuenta</Text><Text style={styles.subtitle}>Cotizá y seguí tus trabajos desde un solo lugar.</Text>
-          </View>
+          </SoftAppear>
 
-          <View style={styles.form}>
+          <FadeInView style={styles.form}>
             <TextInput
               style={styles.input}
               placeholder="Nombre completo"
@@ -107,7 +108,7 @@ export default function RegisterScreen({ navigation }: any) {
             <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
               <Text style={styles.linkText}>¿Ya tenés cuenta? Iniciá sesión</Text>
             </TouchableOpacity>
-          </View>
+          </FadeInView>
         </ScrollView>
       </KeyboardAvoidingView>
     </AppBackground>

@@ -7,6 +7,7 @@ import { RootStackParamList } from '../types/types';
 import { AppBackground, GlassCard } from '../components/GlassUI';
 import { colors, shadow } from '../theme';
 import { getErrorMessage, login } from '../utils/api';
+import { FadeInView, SoftAppear } from '../components/MotionUI';
 
 export default function LoginScreen({ navigation, route }: { navigation: NavigationProp<RootStackParamList>; route: RouteProp<RootStackParamList, 'Login'> }) {
   const [email, setEmail] = useState('');
@@ -36,7 +37,7 @@ export default function LoginScreen({ navigation, route }: { navigation: Navigat
       const roleObject = typeof user?.role === 'object' ? user.role : undefined;
       const role = user?.rol_id ?? user?.role_id ?? roleObject?.id;
       const roleName = String(roleObject?.name ?? user?.role ?? '').toLowerCase();
-      const isStaff = role === 1 || ['admin', 'administrator', 'gerente general', 'stock', 'finanzas'].includes(roleName);
+      const isStaff = [1, 2, 3, 4].includes(role ?? -1) || ['admin', 'administrator', 'administrador', 'gerente general', 'stock', 'finanzas'].includes(roleName);
       navigation.reset({ index: 0, routes: [{ name: isStaff ? 'AdminDashboard' : 'ClientHome' }] });
     } catch (error) {
       Toast.show({ type: 'error', text1: getErrorMessage(error, 'No se pudo iniciar sesión') });
@@ -46,8 +47,8 @@ export default function LoginScreen({ navigation, route }: { navigation: Navigat
   };
 
   return <AppBackground><KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-    <View style={styles.brand}><Image source={require('../assets/logo1.png')} style={styles.logo}/><Text style={styles.tagline}>RENOVAMOS LO QUE IMPORTA</Text></View>
-    <GlassCard style={styles.card}>
+    <SoftAppear style={styles.brand}><Image source={require('../assets/logo1.png')} style={styles.logo}/><Text style={styles.tagline}>RENOVAMOS LO QUE IMPORTA</Text></SoftAppear>
+    <FadeInView><GlassCard style={styles.card}>
       <Text style={styles.welcome}>Bienvenido</Text><Text style={styles.subtitle}>Ingresá para gestionar y seguir tus trabajos.</Text>
       <Text style={styles.label}>Correo electrónico</Text><View style={styles.inputWrap}><Icon name="email-outline" size={20} color={colors.muted}/><TextInput style={styles.input} placeholder="tu@email.com" placeholderTextColor="#93A09F" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none"/></View>
       <Text style={styles.label}>Contraseña</Text><View style={styles.inputWrap}><Icon name="lock-outline" size={20} color={colors.muted}/><TextInput style={styles.input} placeholder="Tu contraseña" placeholderTextColor="#93A09F" value={password} onChangeText={setPassword} secureTextEntry={!showPassword}/><TouchableOpacity onPress={() => setShowPassword(!showPassword)}><Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={21} color={colors.muted}/></TouchableOpacity></View>
@@ -56,8 +57,8 @@ export default function LoginScreen({ navigation, route }: { navigation: Navigat
       <View style={styles.divider}><View style={styles.line}/><Text style={styles.or}>O</Text><View style={styles.line}/></View>
       <TouchableOpacity style={styles.register} onPress={() => navigation.navigate('Register')}><Text style={styles.registerText}>Crear una cuenta</Text></TouchableOpacity>
       <TouchableOpacity style={styles.adminDemo} onPress={() => navigation.navigate('Catalog')}><Icon name="view-grid-outline" size={16} color={colors.muted}/><Text style={styles.adminDemoText}>Ver catálogo sin iniciar sesión</Text></TouchableOpacity>
-    </GlassCard>
-    <View style={styles.trust}><Icon name="shield-check-outline" size={17} color={colors.primary}/><Text style={styles.trustText}>Tus datos y pedidos están protegidos</Text></View>
+    </GlassCard></FadeInView>
+    <FadeInView index={1} style={styles.trust}><Icon name="shield-check-outline" size={17} color={colors.primary}/><Text style={styles.trustText}>Tus datos y pedidos están protegidos</Text></FadeInView>
   </ScrollView></KeyboardAvoidingView></AppBackground>;
 }
 

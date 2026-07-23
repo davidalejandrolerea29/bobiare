@@ -6,6 +6,7 @@ import { RootStackParamList } from '../types/types';
 import { AppBackground, GlassCard, SectionHeader } from '../components/GlassUI';
 import BottomNav from '../components/BottomNav';
 import { colors } from '../theme';
+import { FadeInView, SoftAppear } from '../components/MotionUI';
 
 export default function ClientHomeScreen({ navigation }: { navigation: NavigationProp<RootStackParamList> }) {
   const shortcuts = [
@@ -17,15 +18,15 @@ export default function ClientHomeScreen({ navigation }: { navigation: Navigatio
   return (
     <AppBackground>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+        <SoftAppear style={styles.header}>
           <View>
             <Text style={styles.eyebrow}>BUEN DÍA</Text>
             <Text style={styles.greeting}>Hola, David</Text>
           </View>
           <TouchableOpacity style={styles.bell}><Icon name="bell-outline" size={23} color={colors.ink} /><View style={styles.dot} /></TouchableOpacity>
-        </View>
+        </SoftAppear>
 
-        <GlassCard style={styles.hero}>
+        <FadeInView><GlassCard style={styles.hero}>
           <View style={styles.heroCopy}>
             <View style={styles.aiPill}><Icon name="creation" color={colors.primary} size={14} /><Text style={styles.aiPillText}>NUEVO · ASISTENTE IA</Text></View>
             <Text style={styles.heroTitle}>¿No sabés qué servicio necesitás?</Text>
@@ -35,21 +36,21 @@ export default function ClientHomeScreen({ navigation }: { navigation: Navigatio
             </TouchableOpacity>
           </View>
           <View style={styles.heroIcon}><Icon name="auto-fix" size={55} color={colors.primary} /></View>
-        </GlassCard>
+        </GlassCard></FadeInView>
 
         <SectionHeader title="¿Qué querés hacer?" />
         <View style={styles.shortcutRow}>
-          {shortcuts.map(item => (
-            <TouchableOpacity key={item.label} style={styles.shortcut} onPress={() => navigation.navigate(item.route as never)}>
+          {shortcuts.map((item, index) => (
+            <FadeInView key={item.label} index={index + 1} style={styles.shortcutSlot}><TouchableOpacity style={styles.shortcut} onPress={() => navigation.navigate(item.route as never)}>
               <View style={styles.shortcutIcon}><Icon name={item.icon} size={23} color={colors.primary} /></View>
               <Text style={styles.shortcutLabel}>{item.label}</Text>
               <Text style={styles.shortcutNote}>{item.note}</Text>
-            </TouchableOpacity>
+            </TouchableOpacity></FadeInView>
           ))}
         </View>
 
         <SectionHeader title="Pedido en curso" action="Ver detalle" onAction={() => navigation.navigate('Orders')} />
-        <GlassCard style={styles.orderCard}>
+        <FadeInView index={4}><GlassCard style={styles.orderCard}>
           <View style={styles.orderTop}>
             <View style={styles.orderImage}><Icon name="motorbike" color={colors.primary} size={32} /></View>
             <View style={styles.orderInfo}><Text style={styles.orderId}>PEDIDO #B-2048</Text><Text style={styles.orderName}>Llanta de moto · Rod. 17</Text><Text style={styles.orderMeta}>Granallado + pintura</Text></View>
@@ -58,7 +59,7 @@ export default function ClientHomeScreen({ navigation }: { navigation: Navigatio
           <View style={styles.progress}><View style={styles.progressDone} /></View>
           <View style={styles.progressLabels}><Text style={styles.progressActive}>Recibido</Text><Text style={styles.progressActive}>Evaluación</Text><Text style={styles.progressActive}>Proceso</Text><Text style={styles.progressOff}>Finalizado</Text></View>
           <Text style={styles.estimate}><Icon name="clock-outline" size={14} color={colors.muted} />  Finalización estimada: 24 de julio</Text>
-        </GlassCard>
+        </GlassCard></FadeInView>
       </ScrollView>
       <BottomNav active="ClientHome" />
     </AppBackground>
@@ -82,6 +83,7 @@ const styles = StyleSheet.create({
   heroButtonText: { color: '#fff', fontWeight: '800' },
   heroIcon: { position: 'absolute', right: -5, bottom: -8, width: 115, height: 115, borderRadius: 58, backgroundColor: 'rgba(147,197,253,.28)', alignItems: 'center', justifyContent: 'center' },
   shortcutRow: { flexDirection: 'row', gap: 10, marginBottom: 28 },
+  shortcutSlot: { flex: 1 },
   shortcut: { flex: 1, minHeight: 135, padding: 12, borderRadius: 20, backgroundColor: 'rgba(255,255,255,.68)', borderWidth: 1, borderColor: '#fff' },
   shortcutIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(147,197,253,.28)', justifyContent: 'center', alignItems: 'center', marginBottom: 11 },
   shortcutLabel: { fontWeight: '800', color: colors.ink, fontSize: 13, lineHeight: 16 },

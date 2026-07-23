@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Toast from '../utils/notify';
@@ -8,6 +8,7 @@ import BottomNav from '../components/BottomNav';
 import { colors } from '../theme';
 import { ApiUser } from '../types/types';
 import { getCurrentUser, getErrorMessage, getStoredUser, logout } from '../utils/api';
+import { FadeInView, ListSkeleton } from '../components/MotionUI';
 
 const initials = (name?: string) =>
   (name || 'Cliente')
@@ -56,9 +57,9 @@ export default function ProfileScreen({ navigation }: any) {
   return <AppBackground>
     <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary}/>}>
       <Text style={styles.eyebrow}>MI CUENTA</Text><Text style={styles.title}>Perfil</Text>
-      {loading && !user ? <ActivityIndicator style={styles.loader} size="large" color={colors.primary}/> : <>
-        <GlassCard style={styles.user}><View style={styles.avatar}><Text style={styles.initials}>{initials(user?.name)}</Text></View><View style={styles.userText}><Text style={styles.name}>{user?.name || 'Cliente Bobiare'}</Text><Text style={styles.email}>{user?.email || 'Email no disponible'}</Text><View style={styles.verified}><Icon name={verified ? 'check-decagram' : 'account-check-outline'} size={13} color={colors.primary}/><Text style={styles.verifiedText}>{verified ? 'Correo verificado' : 'Cuenta activa'}{role ? ` · ${role}` : ''}</Text></View></View></GlassCard>
-        <View style={styles.options}>{options.map((item, index) => <TouchableOpacity key={item.label} style={[styles.option, index === options.length - 1 && { borderBottomWidth: 0 }]}><View style={styles.optionIcon}><Icon name={item.icon as React.ComponentProps<typeof Icon>['name']} size={21} color={colors.primary}/></View><View style={styles.optionText}><Text style={styles.optionLabel}>{item.label}</Text><Text style={styles.optionNote}>{item.note}</Text></View><Icon name="chevron-right" size={21} color="#9AA6AC"/></TouchableOpacity>)}</View>
+      {loading && !user ? <ListSkeleton rows={3}/> : <>
+        <FadeInView><GlassCard style={styles.user}><View style={styles.avatar}><Text style={styles.initials}>{initials(user?.name)}</Text></View><View style={styles.userText}><Text style={styles.name}>{user?.name || 'Cliente Bobiare'}</Text><Text style={styles.email}>{user?.email || 'Email no disponible'}</Text><View style={styles.verified}><Icon name={verified ? 'check-decagram' : 'account-check-outline'} size={13} color={colors.primary}/><Text style={styles.verifiedText}>{verified ? 'Correo verificado' : 'Cuenta activa'}{role ? ` · ${role}` : ''}</Text></View></View></GlassCard></FadeInView>
+        <FadeInView index={1}><View style={styles.options}>{options.map((item, index) => <TouchableOpacity key={item.label} style={[styles.option, index === options.length - 1 && { borderBottomWidth: 0 }]}><View style={styles.optionIcon}><Icon name={item.icon as React.ComponentProps<typeof Icon>['name']} size={21} color={colors.primary}/></View><View style={styles.optionText}><Text style={styles.optionLabel}>{item.label}</Text><Text style={styles.optionNote}>{item.note}</Text></View><Icon name="chevron-right" size={21} color="#9AA6AC"/></TouchableOpacity>)}</View></FadeInView>
       </>}
       <TouchableOpacity style={styles.whatsapp} onPress={() => Linking.openURL('https://wa.me/5493510000000?text=Hola,%20necesito%20ayuda%20con%20Bobiare')}><Icon name="whatsapp" size={25} color="#fff"/><View style={styles.helpCopy}><Text style={styles.whatsappTitle}>¿Necesitás ayuda?</Text><Text style={styles.whatsappNote}>Hablemos por WhatsApp</Text></View><Icon name="arrow-top-right" size={20} color="#fff"/></TouchableOpacity>
       <TouchableOpacity style={styles.logout} onPress={handleLogout}><Icon name="logout" size={19} color={colors.danger}/><Text style={styles.logoutText}>Cerrar sesión</Text></TouchableOpacity>

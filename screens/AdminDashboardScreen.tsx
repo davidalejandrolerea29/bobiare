@@ -7,6 +7,7 @@ import { AppBackground, GlassCard } from '../components/GlassUI';
 import { colors, formatPrice } from '../theme';
 import { Order } from '../types/types';
 import { getAdminOrders, getErrorMessage, logout, receiveOrder, registerDeposit } from '../utils/api';
+import { FadeInView, ListSkeleton } from '../components/MotionUI';
 
 const filters = [
   ['all', 'Todos'], ['pending_payment', 'Esperando seña'],
@@ -76,11 +77,11 @@ export default function AdminDashboardScreen({ navigation }: any) {
   return <AppBackground><ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary}/>}>
     <View style={styles.header}><View><Text style={styles.eyebrow}>OPERACIONES</Text><Text style={styles.title}>Pedidos</Text><Text style={styles.subtitle}>{total} pedido(s) en este filtro</Text></View><TouchableOpacity style={styles.logout} onPress={signOut}><Icon name="logout" size={21} color={colors.ink}/></TouchableOpacity></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{filters.map(([key, label]) => <TouchableOpacity key={key} style={[styles.filter, status === key && styles.filterActive]} onPress={() => setStatus(key)}><Text style={[styles.filterText, status === key && styles.filterTextActive]}>{label}</Text></TouchableOpacity>)}</ScrollView>
-    {loading ? <ActivityIndicator size="large" color={colors.primary}/> : !orders.length ? <Text style={styles.empty}>No hay pedidos con este estado.</Text> : orders.map(order => <GlassCard style={styles.order} key={order.id}>
+    {loading ? <ListSkeleton rows={4}/> : !orders.length ? <Text style={styles.empty}>No hay pedidos con este estado.</Text> : orders.map((order, index) => <FadeInView key={order.id} index={index}><GlassCard style={styles.order}>
       <View style={styles.orderTop}><View style={styles.orderIcon}><Icon name="package-variant-closed" size={24} color={colors.primary}/></View><View style={styles.orderInfo}><Text style={styles.orderId}>PEDIDO #{order.id}</Text><Text style={styles.orderItem}>{order.items?.[0]?.product_name_snapshot || 'Pedido Bobiare'}</Text><Text style={styles.orderUser}>{order.user?.name || order.user?.email || 'Cliente'} · {formatPrice(order.total)}</Text></View><Text style={styles.orderState}>{order.status}</Text></View>
       {order.status === 'pending_payment' && <View style={styles.actionBox}><Text style={styles.actionTitle}>Registrar seña del 50%</Text><Text style={styles.actionHelp}>Transferencia por {formatPrice(order.total / 2)}</Text><TouchableOpacity style={styles.button} onPress={() => deposit(order)} disabled={working === order.id}>{working === order.id ? <ActivityIndicator color="#fff"/> : <Text style={styles.buttonText}>Confirmar seña</Text>}</TouchableOpacity></View>}
       {order.status === 'shipped_by_customer' && <View style={styles.actionBox}><Text style={styles.actionTitle}>Recepción en taller</Text>{order.shipments?.[0]?.tracking_number && <Text style={styles.actionHelp}>Tracking: {order.shipments[0].tracking_number}</Text>}<TextInput style={styles.noteInput} placeholder="Estado en que llegó la pieza" value={notes[order.id] || ''} onChangeText={value => setNotes(current => ({ ...current, [order.id]: value }))}/><TouchableOpacity style={styles.button} onPress={() => receive(order)} disabled={working === order.id}>{working === order.id ? <ActivityIndicator color="#fff"/> : <Text style={styles.buttonText}>Marcar como recibido</Text>}</TouchableOpacity></View>}
-    </GlassCard>)}
+    </GlassCard></FadeInView>)}
   </ScrollView></AppBackground>;
 }
 

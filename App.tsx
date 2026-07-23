@@ -1,6 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ import ProfileScreen from './screens/ProfileScreen';
 import { colors } from './theme';
 import { withAuthentication } from './components/ProtectedScreen';
 import { NotificationHost } from './utils/notify';
+import { AppLoading } from './components/MotionUI';
 
 const Stack = createNativeStackNavigator();
 const AuthenticatedHome = withAuthentication(ClientHomeScreen);
@@ -69,11 +70,7 @@ export default function App() {
   }
 
   if (!fontsLoaded) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <AppLoading />;
   }
 
   return (

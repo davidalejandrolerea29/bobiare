@@ -8,6 +8,7 @@ import BottomNav from '../components/BottomNav';
 import { colors, formatPrice } from '../theme';
 import { Order } from '../types/types';
 import { createShipment, getErrorMessage, getOrder, getOrders } from '../utils/api';
+import { FadeInView, ListSkeleton } from '../components/MotionUI';
 
 const statusLabels: Record<string, string> = {
   pending_payment: 'Esperando seña',
@@ -66,15 +67,15 @@ export default function OrdersScreen() {
     <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary}/>}>
       <Text style={styles.eyebrow}>TRAZABILIDAD</Text><Text style={styles.title}>Mis pedidos</Text>
       <View style={styles.filters}>{([['active', 'En curso'], ['completed', 'Finalizados'], ['all', 'Todos']] as const).map(([key, label]) => <TouchableOpacity key={key} onPress={() => setFilter(key)} style={[styles.filter, filter === key && styles.filterActive]}><Text style={[styles.filterText, filter === key && styles.filterTextActive]}>{label}</Text></TouchableOpacity>)}</View>
-      {loading ? <ActivityIndicator size="large" color={colors.primary}/> : !visible.length ? <Text style={styles.empty}>Todavía no hay pedidos para mostrar.</Text> : visible.map(order => {
+      {loading ? <ListSkeleton rows={3}/> : !visible.length ? <Text style={styles.empty}>Todavía no hay pedidos para mostrar.</Text> : visible.map((order, orderIndex) => {
         const step = Math.max(0, statusOrder.indexOf(order.status));
-        return <GlassCard key={order.id} style={styles.card}>
+        return <FadeInView key={order.id} index={orderIndex}><GlassCard style={styles.card}>
           <View style={styles.cardTop}><View style={styles.orderCopy}><Text style={styles.orderId}>PEDIDO #{order.id}</Text><Text style={styles.item}>{order.items?.[0]?.product_name_snapshot || 'Pedido Bobiare'}</Text><Text style={styles.service}>{order.items?.length || 0} ítem(s) · {formatPrice(order.total)}</Text></View><View style={styles.badge}><Text style={styles.badgeText}>{statusLabels[order.status] || order.status}</Text></View></View>
           <View style={styles.timeline}>{statusOrder.slice(0, 4).map((status, index) => <View key={status} style={styles.step}><View style={[styles.stepDot, index <= step && styles.stepDotActive]}>{index < step && <Icon name="check" size={11} color="#fff"/>}</View>{index < 3 && <View style={[styles.stepLine, index < step && styles.stepLineActive]}/>}</View>)}</View>
           {order.status === 'deposit_paid' && <View style={styles.trackingBox}><Text style={styles.trackingTitle}>Ya podés despachar tu pieza</Text><Text style={styles.trackingHelp}>Enviá el paquete por tu cuenta y cargá el tracking del correo.</Text><TextInput style={styles.trackingInput} placeholder="Ej.: CA987654321AR" autoCapitalize="characters" value={tracking[order.id] || ''} onChangeText={value => setTracking(current => ({ ...current, [order.id]: value }))}/><TouchableOpacity style={styles.shipButton} onPress={() => ship(order)} disabled={sending === order.id}>{sending === order.id ? <ActivityIndicator color="#fff"/> : <><Icon name="truck-delivery-outline" size={18} color="#fff"/><Text style={styles.shipButtonText}>Informar despacho</Text></>}</TouchableOpacity></View>}
           {!!order.shipments?.[0]?.tracking_number && <Text style={styles.trackingValue}>Tracking: {order.shipments[0].tracking_number}</Text>}
           {!!order.status_histories?.length && <View style={styles.history}>{order.status_histories.map((history, index) => <View key={`${history.status}-${index}`} style={styles.historyItem}><View style={styles.historyDot}/><View style={styles.historyCopy}><Text style={styles.historyStatus}>{statusLabels[history.status] || history.status}</Text>{history.note && <Text style={styles.historyNote}>{history.note}</Text>}</View></View>)}</View>}
-        </GlassCard>;
+        </GlassCard></FadeInView>;
       })}
     </ScrollView>
     <BottomNav active="Orders"/>

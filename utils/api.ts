@@ -1,17 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { ApiUser, Cart, CartItem, DeliveryTime, Order, Product } from '../types/types';
+import { ApiRole, ApiUser, Cart, CartItem, DeliveryTime, Order, PhotoAnalysis, Product } from '../types/types';
 import { setAuthState } from './authState';
 
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '') ||
   'https://bobiare.n7softwares.com/api/v1';
 
+export const AI_ANALYSIS_PATH =
+  process.env.EXPO_PUBLIC_AI_ANALYSIS_PATH || '/ai/analyze-piece';
+
 export const STORAGE_KEYS = {
   accessToken: 'bobiare.access_token',
   guestToken: 'bobiare.guest_token',
   user: 'bobiare.user',
+  catalog: 'bobiare.catalog.v1',
 } as const;
+
+const CATALOG_DETAIL_TTL = 15 * 60 * 1000;
+let catalogCacheSavedAt = 0;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -70,7 +77,7 @@ const arrayPayload = (payload: any, keys: string[]) => {
 export const normalizeDeliveryTime = (raw: any): DeliveryTime => ({
   id: number(raw.id),
   description: raw.description || raw.name || 'Modalidad',
-  business_days: number(raw.business_days),
+  business_days: number(raw.business_days) || number(String(raw.description || raw.name || '').match(/(\d+)\s*d[ií]as/i)?.[1]),
   extra_cost: number(raw.extra_cost),
 });
 
@@ -101,13 +108,40 @@ export const normalizeProduct = (raw: any): Product => {
     offerPrice: raw.offer_price == null ? null : number(raw.offer_price),
     image: images[0] || '',
     images,
-    category: raw.category?.name || raw.categories?.[0]?.name || raw.category_name,
+    category: raw.category?.name || (typeof raw.categories?.[0] === 'string' ? raw.categories[0] : raw.categories?.[0]?.name || raw.categories?.[0]?.description) || raw.category_name,
     categories: raw.categories,
     deliveryTimes,
     timeEstimate: firstTime?.business_days
       ? `${firstTime.business_days} días hábiles`
       : 'A confirmar',
   };
+};
+
+export const mergeProductSummaryWithCache = (summary: any, cached?: Product): Product => {
+  const current = normalizeProduct(summary);
+  if (!cached) return current;
+  return {
+    ...cached,
+    ...current,
+    image: current.image || cached.image,
+    images: current.images.length ? current.images : cached.images,
+    category: current.category || cached.category,
+    categories: current.categories?.length ? current.categories : cached.categories,
+    deliveryTimes: current.deliveryTimes.length ? current.deliveryTimes : cached.deliveryTimes,
+    timeEstimate: current.deliveryTimes.length ? current.timeEstimate : cached.timeEstimate,
+  };
+};
+
+const readCatalogCache = async () => {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.catalog);
+    if (!stored) return [] as Product[];
+    const parsed = JSON.parse(stored);
+    catalogCacheSavedAt = number(parsed.savedAt);
+    return Array.isArray(parsed.products) ? parsed.products as Product[] : [];
+  } catch {
+    return [] as Product[];
+  }
 };
 
 const normalizeCartItem = (raw: any): CartItem => ({
@@ -176,13 +210,100 @@ export async function getCatalogData() {
 }
 
 export async function getProducts() {
-  const { data } = await api.get('/products/all-products');
-  return arrayPayload(data, ['products', 'data']).map(normalizeProduct);
+  const [{ data }, cachedProducts] = await Promise.all([
+    api.get('/products/all-products'),
+    readCatalogCache(),
+  ]);
+  const summaries = arrayPayload(data, ['products', 'data']);
+  const cachedById = new Map(cachedProducts.map(product => [product.id, product]));
+  return summaries.map((summary: any) =>
+    mergeProductSummaryWithCache(summary, cachedById.get(number(summary.id))));
+}
+
+export async function hydrateProducts(
+  products: Product[],
+  onProduct?: (product: Product) => void,
+  force = false,
+) {
+  if (!force && catalogCacheSavedAt && Date.now() - catalogCacheSavedAt < CATALOG_DETAIL_TTL) {
+    return products;
+  }
+
+  const hydrated = [...products];
+  let nextIndex = 0;
+  let successes = 0;
+  const worker = async () => {
+    while (nextIndex < products.length) {
+      const index = nextIndex++;
+      try {
+        const detail = await getProduct(products[index].id);
+        hydrated[index] = detail;
+        successes += 1;
+        onProduct?.(detail);
+      } catch {
+        // El resumen ya está visible; un detalle fallido no bloquea el catálogo.
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(4, products.length) }, worker));
+  if (successes) {
+    catalogCacheSavedAt = Date.now();
+    await AsyncStorage.setItem(STORAGE_KEYS.catalog, JSON.stringify({
+      savedAt: catalogCacheSavedAt,
+      products: hydrated,
+    }));
+  }
+  return hydrated;
 }
 
 export async function getProduct(id: number) {
   const { data } = await api.get(`/products/product/${id}`);
-  return normalizeProduct(data.product || data.data || data);
+  const rawProduct = data.product || data.data || data;
+  const selectedCategories = Array.isArray(data.categories)
+    ? data.categories.filter((item: any) => item.selected !== false).map((item: any) => ({ id: item.id, name: item.name || item.description }))
+    : rawProduct.categories;
+  const selectedDeliveryTimes = Array.isArray(data.delivery_times)
+    ? data.delivery_times.filter((item: any) => item.selected !== false)
+    : rawProduct.delivery_times;
+  return normalizeProduct({
+    ...rawProduct,
+    categories: selectedCategories,
+    delivery_times: selectedDeliveryTimes,
+  });
+}
+
+export async function analyzePiecePhoto(asset: {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+}): Promise<PhotoAnalysis> {
+  const form = new FormData();
+  form.append('image', {
+    uri: asset.uri,
+    name: asset.fileName || `pieza-${Date.now()}.jpg`,
+    type: asset.mimeType || 'image/jpeg',
+  } as any);
+
+  const { data } = await api.post(AI_ANALYSIS_PATH, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  });
+  const raw = data.analysis || data.data || data;
+  const rawConfidence = number(raw.confidence ?? raw.confidence_percentage);
+  const suggestedRaw = raw.suggested_product || raw.product;
+  const damages = raw.detected_damage || raw.detected_damages || raw.damage || [];
+
+  return {
+    pieceName: raw.piece_name || raw.piece || raw.label || 'Pieza identificada',
+    confidence: Math.round(rawConfidence <= 1 ? rawConfidence * 100 : rawConfidence),
+    description: raw.description || raw.summary || 'La imagen fue analizada correctamente.',
+    detectedDamage: (Array.isArray(damages) ? damages : [damages]).filter(Boolean).map(String),
+    suggestedService: raw.suggested_service || raw.service || suggestedRaw?.name || 'Evaluación especializada',
+    suggestedProductId: number(raw.suggested_product_id || suggestedRaw?.id) || undefined,
+    suggestedProduct: suggestedRaw?.id ? normalizeProduct(suggestedRaw) : undefined,
+    disclaimer: raw.disclaimer,
+  };
 }
 
 export async function getCart() {
@@ -223,9 +344,14 @@ export async function checkout(payload: {
 }) {
   const { data } = await api.post('/cart/checkout', payload);
   if (data.access_token) {
+    const user = (data.user || {
+      id: data.user_id,
+      name: payload.name,
+      email: payload.email,
+    }) as ApiUser;
     await AsyncStorage.multiSet([
       [STORAGE_KEYS.accessToken, data.access_token],
-      [STORAGE_KEYS.user, JSON.stringify({ id: data.user_id, name: payload.name, email: payload.email })],
+      [STORAGE_KEYS.user, JSON.stringify(user)],
     ]);
     setAuthState(true);
   }
@@ -236,12 +362,40 @@ export async function checkout(payload: {
 export async function login(email: string, password: string) {
   const { data } = await api.post('/auth/login', { email, password });
   await AsyncStorage.setItem(STORAGE_KEYS.accessToken, data.access_token);
+  if (data.user) {
+    await AsyncStorage.setItem(STORAGE_KEYS.user, JSON.stringify(data.user));
+    setAuthState(true);
+    return data.user as ApiUser;
+  }
+  // Compatibilidad con servidores anteriores que devolvían solamente el JWT.
   return getCurrentUser();
 }
 
 export async function register(name: string, email: string, password: string) {
   const { data } = await api.post('/auth/register', { name, email, password });
   return data;
+}
+
+export async function refreshSession() {
+  const { data } = await api.post('/auth/refresh');
+  if (data.access_token) {
+    await AsyncStorage.setItem(STORAGE_KEYS.accessToken, data.access_token);
+  }
+  if (data.user) {
+    await AsyncStorage.setItem(STORAGE_KEYS.user, JSON.stringify(data.user));
+  }
+  setAuthState(true);
+  return data as { access_token: string; token_type: string; expires_in: number; user: ApiUser };
+}
+
+export async function getRoles(): Promise<ApiRole[]> {
+  const { data } = await api.get('/roles');
+  const roles = Array.isArray(data) ? data : data.roles || data.data || [];
+  return roles.map((role: any) => ({
+    ...role,
+    id: number(role.id),
+    name: String(role.name),
+  }));
 }
 
 export async function logout() {

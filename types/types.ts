@@ -19,6 +19,17 @@ export type Product = {
   timeEstimate: string;
 };
 
+export type PhotoAnalysis = {
+  pieceName: string;
+  confidence: number;
+  description: string;
+  detectedDamage: string[];
+  suggestedService: string;
+  suggestedProductId?: number;
+  suggestedProduct?: Product;
+  disclaimer?: string;
+};
+
 export type CartItem = {
   id: number;
   product_id?: number;
@@ -71,6 +82,13 @@ export type ApiUser = {
   role_id?: number;
   role?: string | { id?: number; name?: string };
   addresses?: unknown[];
+};
+
+export type ApiRole = {
+  id: number;
+  name: 'Administrador' | 'Gerente General' | 'Finanzas' | 'Stock' | 'Cliente' | string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type CheckoutDetails = {

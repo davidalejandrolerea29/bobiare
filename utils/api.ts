@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { ApiRole, ApiUser, Cart, CartItem, DeliveryTime, Order, PhotoAnalysis, Product } from '../types/types';
+import { ApiRole, ApiUser, Cart, CartItem, DeliveryTime, Order, PhotoAnalysis, Product, ProductAttributeType, SelectedAttribute } from '../types/types';
 import { setAuthState } from './authState';
 
 export const API_BASE_URL =
@@ -14,6 +14,7 @@ export const STORAGE_KEYS = {
   accessToken: 'bobiare.access_token',
   guestToken: 'bobiare.guest_token',
   user: 'bobiare.user',
+  tokenExpiresAt: 'bobiare.token_expires_at',
   catalog: 'bobiare.catalog.v1',
 } as const;
 
@@ -26,11 +27,59 @@ const api = axios.create({
   headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
 });
 
+const authApi = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 20000,
+  headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+});
+
+let refreshPromise: Promise<string | null> | null = null;
+
+const persistSession = async (data: any, fallbackUser?: ApiUser) => {
+  if (!data.access_token) return;
+  const entries: [string, string][] = [
+    [STORAGE_KEYS.accessToken, data.access_token],
+    [STORAGE_KEYS.tokenExpiresAt, String(Date.now() + number(data.expires_in || 3600) * 1000)],
+  ];
+  const user = data.user || fallbackUser;
+  if (user) entries.push([STORAGE_KEYS.user, JSON.stringify(user)]);
+  await AsyncStorage.multiSet(entries);
+  setAuthState(true);
+};
+
+const refreshAccessToken = async () => {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.accessToken);
+    if (!token) return null;
+    try {
+      const { data } = await authApi.post('/auth/refresh', undefined, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await persistSession(data);
+      return data.access_token as string;
+    } catch {
+      await AsyncStorage.multiRemove([STORAGE_KEYS.accessToken, STORAGE_KEYS.tokenExpiresAt, STORAGE_KEYS.user]);
+      setAuthState(false);
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+};
+
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const [accessToken, guestToken] = await Promise.all([
+  let [accessToken, guestToken, expiresAt] = await Promise.all([
     AsyncStorage.getItem(STORAGE_KEYS.accessToken),
     AsyncStorage.getItem(STORAGE_KEYS.guestToken),
+    AsyncStorage.getItem(STORAGE_KEYS.tokenExpiresAt),
   ]);
+
+  const isRefreshRequest = config.url === '/auth/refresh';
+  if (accessToken && !isRefreshRequest && expiresAt && number(expiresAt) - Date.now() < 60_000) {
+    accessToken = await refreshAccessToken();
+  }
 
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   if (guestToken) config.headers['X-Guest-Token'] = guestToken;
@@ -45,7 +94,7 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    await AsyncStorage.multiRemove([STORAGE_KEYS.accessToken, STORAGE_KEYS.user]);
+    await AsyncStorage.multiRemove([STORAGE_KEYS.accessToken, STORAGE_KEYS.tokenExpiresAt, STORAGE_KEYS.user]);
     setAuthState(false);
 
     const url = config.url || '';
@@ -99,6 +148,18 @@ export const normalizeProduct = (raw: any): Product => {
   const deliveryTimes = (raw.delivery_times || raw.deliveryTimes || [])
     .map(normalizeDeliveryTime);
   const firstTime = deliveryTimes[0];
+  const attributeTypes: ProductAttributeType[] = (raw.attribute_types || raw.attributeTypes || [])
+    .map((type: any) => ({
+      id: number(type.id),
+      name: type.name || type.description || 'Opción',
+      key: type.key || 'generic',
+      attributes: (type.attributes || []).map((attribute: any) => ({
+        ...attribute,
+        id: number(attribute.id),
+        description: attribute.description || attribute.name || 'Opción',
+      })),
+    }))
+    .filter((type: ProductAttributeType) => type.attributes.length > 0);
 
   return {
     id: number(raw.id),
@@ -111,6 +172,7 @@ export const normalizeProduct = (raw: any): Product => {
     category: raw.category?.name || (typeof raw.categories?.[0] === 'string' ? raw.categories[0] : raw.categories?.[0]?.name || raw.categories?.[0]?.description) || raw.category_name,
     categories: raw.categories,
     deliveryTimes,
+    attributeTypes,
     timeEstimate: firstTime?.business_days
       ? `${firstTime.business_days} días hábiles`
       : 'A confirmar',
@@ -128,6 +190,7 @@ export const mergeProductSummaryWithCache = (summary: any, cached?: Product): Pr
     category: current.category || cached.category,
     categories: current.categories?.length ? current.categories : cached.categories,
     deliveryTimes: current.deliveryTimes.length ? current.deliveryTimes : cached.deliveryTimes,
+    attributeTypes: current.attributeTypes.length ? current.attributeTypes : (cached.attributeTypes || []),
     timeEstimate: current.deliveryTimes.length ? current.timeEstimate : cached.timeEstimate,
   };
 };
@@ -150,11 +213,13 @@ const normalizeCartItem = (raw: any): CartItem => ({
   product_id: raw.product_id == null ? undefined : number(raw.product_id),
   product_name_snapshot: raw.product_name_snapshot || raw.product?.name || 'Servicio',
   unit_price_snapshot: number(raw.unit_price_snapshot),
+  delivery_time_id: raw.delivery_time_id == null ? undefined : number(raw.delivery_time_id),
   delivery_time_snapshot: raw.delivery_time_snapshot
     ? { ...raw.delivery_time_snapshot, extra_cost: number(raw.delivery_time_snapshot.extra_cost) }
     : undefined,
   quantity: number(raw.quantity) || 1,
   subtotal: number(raw.subtotal),
+  selected_attributes: Array.isArray(raw.selected_attributes) ? raw.selected_attributes : [],
   product: raw.product ? normalizeProduct(raw.product) : undefined,
 });
 
@@ -270,6 +335,12 @@ export async function getProduct(id: number) {
     ...rawProduct,
     categories: selectedCategories,
     delivery_times: selectedDeliveryTimes,
+    attribute_types: Array.isArray(data.attribute_types)
+      ? data.attribute_types.map((type: any) => ({
+        ...type,
+        attributes: (type.attributes || []).filter((item: any) => item.selected !== false),
+      }))
+      : rawProduct.attribute_types,
   });
 }
 
@@ -319,8 +390,17 @@ export async function addCartItem(payload: {
   delivery_time_id: number;
   piece_description: string;
   quantity: number;
+  selected_attributes?: SelectedAttribute[];
 }) {
   const { data } = await api.post('/cart/items', payload);
+  const item = normalizeCartItem(data.item || data);
+  const guestToken = data.guest_token || data.item?.guest_token;
+  if (guestToken) await AsyncStorage.setItem(STORAGE_KEYS.guestToken, guestToken);
+  return item;
+}
+
+export async function updateCartItem(id: number, quantity: number) {
+  const { data } = await api.put(`/cart/items/${id}`, { quantity });
   return normalizeCartItem(data.item || data);
 }
 
@@ -349,22 +429,44 @@ export async function checkout(payload: {
       name: payload.name,
       email: payload.email,
     }) as ApiUser;
-    await AsyncStorage.multiSet([
-      [STORAGE_KEYS.accessToken, data.access_token],
-      [STORAGE_KEYS.user, JSON.stringify(user)],
-    ]);
-    setAuthState(true);
+    await persistSession(data, user);
   }
   await AsyncStorage.removeItem(STORAGE_KEYS.guestToken);
   return { ...data, id: number(data.id), total: number(data.total) };
 }
 
 export async function login(email: string, password: string) {
+  const hadGuestCart = Boolean(await AsyncStorage.getItem(STORAGE_KEYS.guestToken));
+  let guestItems: CartItem[] = [];
+  if (hadGuestCart) {
+    try {
+      guestItems = (await getCart()).items;
+    } catch {
+      // Iniciar sesión sigue siendo posible aunque no se pueda leer el carrito invitado.
+    }
+  }
   const { data } = await api.post('/auth/login', { email, password });
-  await AsyncStorage.setItem(STORAGE_KEYS.accessToken, data.access_token);
+  await persistSession(data, data.user);
+  if (guestItems.length) {
+    try {
+      const authenticatedCart = await getCart();
+      const existingIds = new Set(authenticatedCart.items.map(item => item.id));
+      for (const item of guestItems) {
+        if (existingIds.has(item.id) || !item.product_id || !item.delivery_time_id) continue;
+        await addCartItem({
+          product_id: item.product_id,
+          delivery_time_id: item.delivery_time_id,
+          piece_description: item.piece_description || '',
+          quantity: item.quantity,
+          selected_attributes: item.selected_attributes,
+        });
+      }
+    } catch {
+      // El login ya fue exitoso; el backend puede haber asociado el carrito por su cuenta.
+    }
+  }
+  if (hadGuestCart) await AsyncStorage.removeItem(STORAGE_KEYS.guestToken);
   if (data.user) {
-    await AsyncStorage.setItem(STORAGE_KEYS.user, JSON.stringify(data.user));
-    setAuthState(true);
     return data.user as ApiUser;
   }
   // Compatibilidad con servidores anteriores que devolvían solamente el JWT.
@@ -377,14 +479,9 @@ export async function register(name: string, email: string, password: string) {
 }
 
 export async function refreshSession() {
-  const { data } = await api.post('/auth/refresh');
-  if (data.access_token) {
-    await AsyncStorage.setItem(STORAGE_KEYS.accessToken, data.access_token);
-  }
-  if (data.user) {
-    await AsyncStorage.setItem(STORAGE_KEYS.user, JSON.stringify(data.user));
-  }
-  setAuthState(true);
+  const token = await AsyncStorage.getItem(STORAGE_KEYS.accessToken);
+  const { data } = await authApi.post('/auth/refresh', undefined, { headers: { Authorization: `Bearer ${token}` } });
+  await persistSession(data);
   return data as { access_token: string; token_type: string; expires_in: number; user: ApiUser };
 }
 
@@ -399,8 +496,14 @@ export async function getRoles(): Promise<ApiRole[]> {
 }
 
 export async function logout() {
-  await AsyncStorage.multiRemove([STORAGE_KEYS.accessToken, STORAGE_KEYS.user]);
-  setAuthState(false);
+  try {
+    await api.get('/auth/logout');
+  } catch {
+    // Aunque el servidor no responda, la sesión local debe cerrarse.
+  } finally {
+    await AsyncStorage.multiRemove([STORAGE_KEYS.accessToken, STORAGE_KEYS.tokenExpiresAt, STORAGE_KEYS.user]);
+    setAuthState(false);
+  }
 }
 
 export async function getStoredUser(): Promise<ApiUser | null> {
@@ -455,9 +558,42 @@ export async function getOrder(id: number) {
   return normalizeOrder(data.order || data.data || data);
 }
 
+export async function getOrderDetails(id: number) {
+  const [order, shipments, payments] = await Promise.allSettled([
+    getOrder(id),
+    getShipments(id),
+    getPayments(id),
+  ]);
+  if (order.status === 'rejected') throw order.reason;
+  return {
+    ...order.value,
+    shipments: shipments.status === 'fulfilled' ? shipments.value : order.value.shipments,
+    payments: payments.status === 'fulfilled' ? payments.value : order.value.payments,
+  };
+}
+
 export async function createShipment(id: number, tracking_number: string) {
   const { data } = await api.post(`/orders/${id}/shipments`, { tracking_number });
   return data;
+}
+
+export async function getShipments(id: number) {
+  const { data } = await api.get(`/orders/${id}/shipments`);
+  return arrayPayload(data, ['shipments', 'data']);
+}
+
+export async function getPayments(id: number) {
+  const { data } = await api.get(`/orders/${id}/payments`);
+  return arrayPayload(data, ['payments', 'data']).map((payment: any) => ({
+    ...payment,
+    amount: number(payment.amount),
+  }));
+}
+
+export async function createMercadoPagoCheckout(id: number) {
+  const { data } = await api.post(`/orders/${id}/checkout-mercadopago`);
+  if (!data.init_point) throw new Error('El servidor no devolvió el enlace de Mercado Pago.');
+  return data as { init_point: string; preference_id?: string };
 }
 
 export async function getAdminOrders(status?: string) {

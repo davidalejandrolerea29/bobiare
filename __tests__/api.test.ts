@@ -47,6 +47,25 @@ test('accepts category names returned as strings by the product list', () => {
   }).category).toBe('Motos');
 });
 
+test('normalizes enabled color picker attributes from product detail', () => {
+  const product = normalizeProduct({
+    id: 4,
+    name: 'Tanque',
+    attribute_types: [{
+      id: 6,
+      name: 'Color picker',
+      key: 'color_picker',
+      attributes: [{ id: 3, description: 'Azul', hex_value: '#2563EB', selected: true }],
+    }],
+  });
+
+  expect(product.attributeTypes[0]).toMatchObject({
+    id: 6,
+    key: 'color_picker',
+    attributes: [{ id: 3, description: 'Azul', hex_value: '#2563EB' }],
+  });
+});
+
 test('keeps cached product images while using the latest catalog price', () => {
   const cached = normalizeProduct({
     id: 3,

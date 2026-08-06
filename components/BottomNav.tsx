@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { NavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../types/types';
 import { colors, shadow } from '../theme';
 import { isAuthenticated } from '../utils/api';
@@ -26,6 +27,7 @@ const items: Array<{
 export default function BottomNav({ active }: { active: string }) {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const authenticated = useAuthState();
+  const insets = useSafeAreaInsets();
 
   useFocusEffect(useCallback(() => {
     if (authenticated === null) isAuthenticated();
@@ -35,8 +37,8 @@ export default function BottomNav({ active }: { active: string }) {
 
   return (
     <View
-      className="absolute bottom-2.5 left-3.5 right-3.5 h-[74px] flex-row items-center rounded-[26px] border border-white bg-white/90 px-1.5"
-      style={shadow}>
+      className="absolute left-3.5 right-3.5 h-[74px] flex-row items-center rounded-[26px] border border-white bg-white/90 px-1.5"
+      style={[shadow, { bottom: insets.bottom + 10 }]}>
       <View
         pointerEvents="none"
         className="absolute left-6 right-6 top-0 h-px bg-white"

@@ -6,8 +6,10 @@ import Toast from '../utils/notify';
 import { RootStackParamList } from '../types/types';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { AppBackground } from '../components/GlassUI';
+import LocationSelect, { LocationSelectOption } from '../components/LocationSelect';
 import { colors, formatPrice, shadow } from '../theme';
 import { checkout, getCart, getErrorMessage, getStatusCode, isAuthenticated } from '../utils/api';
+import { ARGENTINA_PROVINCES } from '../utils/georef';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList, 'Checkout'>;
 
@@ -16,6 +18,7 @@ export default function CheckoutScreen() {
   const [authenticated, setAuthenticated] = useState(false);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '', email: '', password: '', recipientName: '', phone: '', street: '',
     city: '', province: '', postalCode: '', notes: '',
@@ -30,6 +33,11 @@ export default function CheckoutScreen() {
   const field = (key: keyof typeof form, placeholder: string, props: any = {}) =>
     <TextInput style={styles.input} placeholder={placeholder} placeholderTextColor="#8C999E" value={form[key]} onChangeText={text => setForm(current => ({ ...current, [key]: text }))} {...props}/>;
   const goBack = () => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Cart');
+
+  const selectProvince = (province: LocationSelectOption) => {
+    setSelectedProvinceId(province.id);
+    setForm(current => ({ ...current, province: province.name }));
+  };
 
   const submit = async () => {
     Keyboard.dismiss();
@@ -89,8 +97,24 @@ export default function CheckoutScreen() {
         {field('password', 'Contraseña (mínimo 8 caracteres)', { secureTextEntry: true })}
         <Text style={styles.help}>La cuenta se crea automáticamente cuando confirmás el pedido.</Text>
       </View>}
-      <View style={styles.section}><Text style={styles.sectionTitle}>Dirección de envío</Text>{field('recipientName', 'Nombre de quien recibe')}{field('phone', 'Teléfono', { keyboardType: 'phone-pad' })}{field('street', 'Calle y número')}{field('city', 'Ciudad')}{field('province', 'Provincia')}{field('postalCode', 'Código postal')}{field('notes', 'Notas para el pedido (opcional)', { multiline: true })}</View>
-      <View style={styles.totalContainer}><Text style={styles.totalLabel}>TOTAL CALCULADO POR EL SERVIDOR</Text><Text style={styles.totalText}>{formatPrice(total)}</Text><Text style={styles.help}>La seña se registra manualmente cuando Finanzas confirma el pago.</Text></View>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Dirección de envío</Text>
+        {field('recipientName', 'Nombre de quien recibe')}
+        {field('phone', 'Teléfono', { keyboardType: 'phone-pad' })}
+        {field('street', 'Calle y número')}
+        <LocationSelect
+          label="Provincia"
+          placeholder="Seleccioná una provincia"
+          value={form.province}
+          selectedId={selectedProvinceId}
+          options={ARGENTINA_PROVINCES}
+          onSelect={selectProvince}
+        />
+        {field('city', 'Ciudad o localidad')}
+        {field('postalCode', 'Código postal', { keyboardType: 'numeric' })}
+        {field('notes', 'Notas para el pedido (opcional)', { multiline: true })}
+      </View>
+      <View style={styles.totalContainer}><Text style={styles.totalLabel}>TOTAL CALCULADO POR EL SERVIDOR</Text><Text style={styles.totalText}>{formatPrice(total)}</Text><Text style={styles.help}>Después de confirmar el pedido vas a poder abonar el total con Mercado Pago.</Text></View>
       <TouchableOpacity style={[styles.paymentButton, loading && styles.disabled]} onPress={submit} disabled={loading}>{loading ? <ActivityIndicator color="#fff"/> : <><Icon name="check-circle-outline" size={20} color="#fff"/><Text style={styles.paymentButtonText}>Confirmar pedido</Text></>}</TouchableOpacity>
     </ScrollView>
   </KeyboardAvoidingView></AppBackground>;

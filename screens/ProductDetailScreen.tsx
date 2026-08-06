@@ -4,7 +4,7 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import Toast from '../utils/notify';
-import { DeliveryTime, RootStackParamList } from '../types/types';
+import { DeliveryTime, RootStackParamList, SelectedAttribute } from '../types/types';
 import { AppBackground, GlassCard, PrimaryButton } from '../components/GlassUI';
 import { colors, formatPrice } from '../theme';
 import { addCartItem, getCatalogData, getErrorMessage, getProduct } from '../utils/api';
@@ -20,6 +20,7 @@ export default function ProductDetailScreen() {
   const [deliveryTimes, setDeliveryTimes] = useState<DeliveryTime[]>(initial.deliveryTimes);
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<number | null>(initial.deliveryTimes[0]?.id ?? null);
   const [description, setDescription] = useState('');
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -37,6 +38,10 @@ export default function ProductDetailScreen() {
   const basePrice = product.offerPrice ?? product.price;
   const finalPrice = useMemo(() => basePrice + (selectedDelivery?.extra_cost || 0), [basePrice, selectedDelivery]);
 
+  const toggleAttribute = (typeId: number, attributeId: number) => {
+    setSelectedAttributes(current => ({ ...current, [typeId]: attributeId }));
+  };
+
   const add = async () => {
     if (!selectedDeliveryId) {
       Toast.show({ type: 'error', text1: 'Elegí un plazo de entrega' });
@@ -48,11 +53,21 @@ export default function ProductDetailScreen() {
     }
     setLoading(true);
     try {
+      const attributes: SelectedAttribute[] = product.attributeTypes.flatMap(type => {
+        const attribute = type.attributes.find(item => item.id === selectedAttributes[type.id]);
+        return attribute ? [{
+          attribute_type_id: type.id,
+          attribute_id: attribute.id,
+          description: attribute.description,
+          hex_value: attribute.hex_value,
+        }] : [];
+      });
       await addCartItem({
         product_id: product.id,
         delivery_time_id: selectedDeliveryId,
         piece_description: description.trim(),
         quantity: 1,
+        selected_attributes: attributes,
       });
       Toast.show({ type: 'success', text1: 'Producto agregado al carrito' });
       navigation.navigate('Cart');
@@ -72,6 +87,16 @@ export default function ProductDetailScreen() {
       <Text style={styles.name}>{product.name}</Text><Text style={styles.description}>{product.description}</Text>
       <View style={styles.priceRow}><View><Text style={styles.from}>{product.offerPrice ? 'PRECIO DE OFERTA' : 'PRECIO DESDE'}</Text><Text style={styles.price}>{formatPrice(finalPrice)}</Text></View>{selectedDelivery && <View style={styles.time}><Icon name="clock-outline" size={19} color={colors.primary}/><View><Text style={styles.timeLabel}>TIEMPO ESTIMADO</Text><Text style={styles.timeValue}>{selectedDelivery.business_days} días hábiles</Text></View></View>}</View>
       <GlassCard style={styles.section}><Text style={styles.sectionTitle}>Plazo del servicio</Text><View style={styles.options}>{deliveryTimes.map(option => <TouchableOpacity key={option.id} onPress={() => setSelectedDeliveryId(option.id)} style={[styles.option, selectedDeliveryId === option.id && styles.optionActive]}><View style={[styles.radio, selectedDeliveryId === option.id && styles.radioActive]}>{selectedDeliveryId === option.id && <View style={styles.radioInner}/>}</View><View style={styles.optionCopy}><Text style={styles.optionTitle}>{option.description}</Text><Text style={styles.optionNote}>{option.business_days} días hábiles</Text></View><Text style={styles.extra}>{option.extra_cost ? `+ ${formatPrice(option.extra_cost)}` : 'Sin adicional'}</Text></TouchableOpacity>)}</View>{!deliveryTimes.length && <Text style={styles.muted}>No hay plazos disponibles para este servicio.</Text>}</GlassCard>
+      {product.attributeTypes.map(type => <GlassCard key={type.id} style={[styles.section, styles.attributeSection]}>
+        <Text style={styles.sectionTitle}>{type.name}</Text>
+        <View style={styles.attributeOptions}>{type.attributes.map(attribute => {
+          const active = selectedAttributes[type.id] === attribute.id;
+          return <TouchableOpacity key={attribute.id} accessibilityRole="radio" accessibilityState={{ checked: active }} onPress={() => toggleAttribute(type.id, attribute.id)} style={[styles.attributeOption, active && styles.attributeOptionActive]}>
+            {type.key === 'color_picker' && <View style={[styles.swatch, { backgroundColor: attribute.hex_value || '#D5DEDC' }]}>{active && <Icon name="check" size={14} color="#fff"/>}</View>}
+            <Text style={[styles.attributeText, active && styles.attributeTextActive]}>{attribute.description}</Text>
+          </TouchableOpacity>;
+        })}</View>
+      </GlassCard>)}
       <Text style={styles.sectionTitleOutside}>Contanos sobre tu pieza</Text>
       <TextInput style={styles.textarea} multiline numberOfLines={4} textAlignVertical="top" placeholder="Ej.: tanque de Honda XR250, óxido leve y una abolladura..." placeholderTextColor="#8C999E" value={description} onChangeText={setDescription} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}/>
       <GlassCard style={styles.notice}><Icon name="information-outline" size={22} color={colors.primary}/><Text style={styles.noticeText}>El precio final lo calcula el servidor usando el precio vigente y el adicional del plazo elegido.</Text></GlassCard>
@@ -87,6 +112,7 @@ const styles = StyleSheet.create({
   imageWrap: { height: 290, borderRadius: 28, backgroundColor: '#DEE9E5', overflow: 'hidden' }, image: { width: '100%', height: '100%' }, placeholder: { alignItems: 'center', justifyContent: 'center' }, tag: { position: 'absolute', left: 14, top: 14, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: 'rgba(255,255,255,.86)' }, tagText: { color: colors.primary, fontSize: 10, fontWeight: '900' },
   name: { fontSize: 27, color: colors.ink, fontWeight: '900', letterSpacing: -.8, marginTop: 19 }, description: { color: colors.muted, marginTop: 4, lineHeight: 20 }, priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 20 }, from: { color: colors.muted, fontSize: 9, letterSpacing: .8, fontWeight: '900' }, price: { fontSize: 23, color: colors.primary, fontWeight: '900', marginTop: 2 }, time: { flexDirection: 'row', gap: 8, alignItems: 'center' }, timeLabel: { color: colors.muted, fontSize: 8, fontWeight: '900' }, timeValue: { color: colors.ink, fontSize: 11, fontWeight: '800', marginTop: 2 },
   section: { padding: 17 }, sectionTitle: { color: colors.ink, fontSize: 16, fontWeight: '900', marginBottom: 13 }, options: { gap: 9 }, option: { minHeight: 64, borderRadius: 16, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13 }, optionActive: { borderColor: colors.primary, backgroundColor: 'rgba(147,197,253,.20)' }, radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: '#A4AFB2', alignItems: 'center', justifyContent: 'center', marginRight: 11 }, radioActive: { borderColor: colors.primary }, radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }, optionCopy: { flex: 1 }, optionTitle: { color: colors.ink, fontWeight: '800' }, optionNote: { color: colors.muted, fontSize: 11, marginTop: 2 }, extra: { color: colors.primary, fontSize: 11, fontWeight: '800' },
+  attributeSection: { marginTop: 14 }, attributeOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, attributeOption: { minHeight: 42, borderRadius: 13, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,.5)' }, attributeOptionActive: { borderColor: colors.primary, backgroundColor: 'rgba(147,197,253,.20)' }, attributeText: { color: colors.ink, fontSize: 12, fontWeight: '700' }, attributeTextActive: { color: colors.primaryDark }, swatch: { width: 25, height: 25, borderRadius: 13, borderWidth: 1, borderColor: 'rgba(0,0,0,.10)', alignItems: 'center', justifyContent: 'center' },
   sectionTitleOutside: { color: colors.ink, fontSize: 16, fontWeight: '900', marginTop: 21, marginBottom: 12 }, textarea: { minHeight: 110, padding: 15, borderRadius: 17, backgroundColor: 'rgba(255,255,255,.76)', borderWidth: 1, borderColor: '#fff', color: colors.ink },
   notice: { flexDirection: 'row', gap: 10, padding: 14, marginVertical: 20, borderRadius: 17 }, noticeText: { flex: 1, color: colors.muted, fontSize: 11, lineHeight: 16 }, muted: { color: colors.muted },
 });

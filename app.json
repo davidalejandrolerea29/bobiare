@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "scheme": "bobiare",
   "userInterfaceStyle": "light",
-  "icon": "./assets/icon.png",
+  "icon": "./assets/logo2.png",
   "splash": {
     "image": "./assets/splash-icon.png",
     "resizeMode": "contain",
@@ -13,13 +13,37 @@
   },
   "android": {
     "package": "com.bobiare",
+    "intentFilters": [
+      {
+        "action": "VIEW",
+        "autoVerify": true,
+        "data": [
+          {
+            "scheme": "https",
+            "host": "bobiare.n7softwares.com",
+            "pathPrefix": "/confirmacion"
+          }
+        ],
+        "category": [
+          "BROWSABLE",
+          "DEFAULT"
+        ]
+      }
+    ],
     "adaptiveIcon": {
-      "foregroundImage": "./assets/adaptive-icon.png",
+      "foregroundImage": "./assets/logo2.png",
       "backgroundColor": "#ffffff"
     }
   },
   "ios": {
-    "bundleIdentifier": "com.bobiare"
+    "bundleIdentifier": "com.bobiare",
+    "associatedDomains": [
+      "applinks:bobiare.n7softwares.com",
+      "applinks:bobiare.n7softwares.com"
+    ],
+    "infoPlist": {
+      "ITSAppUsesNonExemptEncryption": false
+    }
   },
   "plugins": [
     "expo-font",

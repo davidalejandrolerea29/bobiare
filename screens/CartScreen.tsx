@@ -7,7 +7,7 @@ import Toast from '../utils/notify';
 import { Cart, RootStackParamList } from '../types/types';
 import { AppBackground } from '../components/GlassUI';
 import { colors, formatPrice, shadow } from '../theme';
-import { getCart, getErrorMessage, removeCartItem } from '../utils/api';
+import { getCart, getErrorMessage, removeCartItem, updateCartItem } from '../utils/api';
 import { FadeInView, ListSkeleton } from '../components/MotionUI';
 
 type Navigation = StackNavigationProp<RootStackParamList, 'Cart'>;
@@ -18,6 +18,7 @@ export default function CartScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
+  const [updating, setUpdating] = useState<number | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
@@ -45,6 +46,18 @@ export default function CartScreen() {
       setRemoving(null);
     }
   };
+  const changeQuantity = async (id: number, quantity: number) => {
+    if (quantity < 1) return;
+    setUpdating(id);
+    try {
+      await updateCartItem(id, quantity);
+      await load();
+    } catch (error) {
+      Toast.show({ type: 'error', text1: getErrorMessage(error, 'No se pudo cambiar la cantidad') });
+    } finally {
+      setUpdating(null);
+    }
+  };
   const goBack = () => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Catalog');
 
   return <AppBackground><View style={styles.container}>
@@ -54,7 +67,7 @@ export default function CartScreen() {
         {!cart?.items.length ? <View style={styles.emptyWrap}><Icon name="cart-outline" size={55} color={colors.muted}/><Text style={styles.emptyCart}>Tu carrito está vacío</Text><TouchableOpacity onPress={() => navigation.navigate('Catalog')}><Text style={styles.catalogLink}>Explorar el catálogo</Text></TouchableOpacity></View> :
           cart.items.map((item, index) => <FadeInView key={item.id} index={index}><View style={styles.cartItem}>
             <View style={styles.itemIcon}><Icon name="package-variant" size={25} color={colors.primary}/></View>
-            <View style={styles.itemInfo}><Text style={styles.itemName}>{item.product_name_snapshot}</Text><Text style={styles.serviceName}>{item.delivery_time_snapshot?.description || 'Plazo elegido'} · Cant. {item.quantity}</Text>{item.piece_description && <Text style={styles.piece} numberOfLines={2}>{item.piece_description}</Text>}<Text style={styles.itemPrice}>{formatPrice(item.subtotal)}</Text></View>
+            <View style={styles.itemInfo}><Text style={styles.itemName}>{item.product_name_snapshot}</Text><Text style={styles.serviceName}>{item.delivery_time_snapshot?.description || 'Plazo elegido'}</Text>{item.piece_description && <Text style={styles.piece} numberOfLines={2}>{item.piece_description}</Text>}{!!item.selected_attributes?.length && <Text style={styles.attributes}>{item.selected_attributes.map(attribute => attribute.description).join(' · ')}</Text>}<View style={styles.itemBottom}><View style={styles.quantity}><TouchableOpacity onPress={() => changeQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1 || updating === item.id}><Icon name="minus" size={16} color={colors.primary}/></TouchableOpacity>{updating === item.id ? <ActivityIndicator size="small" color={colors.primary}/> : <Text style={styles.quantityText}>{item.quantity}</Text>}<TouchableOpacity onPress={() => changeQuantity(item.id, item.quantity + 1)} disabled={updating === item.id}><Icon name="plus" size={16} color={colors.primary}/></TouchableOpacity></View><Text style={styles.itemPrice}>{formatPrice(item.subtotal)}</Text></View></View>
             <TouchableOpacity style={styles.removeButton} onPress={() => remove(item.id)} disabled={removing === item.id}>{removing === item.id ? <ActivityIndicator size="small" color={colors.danger}/> : <Icon name="trash-can-outline" size={19} color={colors.danger}/>}</TouchableOpacity>
           </View></FadeInView>)}
       </ScrollView>}
@@ -65,6 +78,6 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent', padding: 20 }, header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }, back: { width: 44, height: 44, borderRadius: 15, backgroundColor: 'rgba(255,255,255,.7)', alignItems: 'center', justifyContent: 'center' }, title: { fontSize: 23, fontWeight: '900', color: colors.ink },
   loader: { flex: 1 }, itemsContainer: { flex: 1 }, emptyWrap: { alignItems: 'center', marginTop: 65 }, emptyCart: { textAlign: 'center', fontSize: 16, color: colors.muted, marginTop: 14 }, catalogLink: { color: colors.primary, fontWeight: '800', marginTop: 10 },
-  cartItem: { backgroundColor: 'rgba(255,255,255,.76)', padding: 15, borderRadius: 22, marginBottom: 15, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#fff', ...shadow }, itemIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(147,197,253,.28)', alignItems: 'center', justifyContent: 'center' }, itemInfo: { flex: 1, marginLeft: 12 }, itemName: { fontSize: 16, fontWeight: '900', color: colors.ink, marginBottom: 5 }, serviceName: { color: colors.muted, fontSize: 12 }, piece: { color: colors.muted, fontSize: 11, fontStyle: 'italic', marginTop: 4 }, itemPrice: { fontSize: 16, fontWeight: 'bold', color: colors.primary, marginTop: 8 }, removeButton: { backgroundColor: 'rgba(184,74,74,.1)', width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cartItem: { backgroundColor: 'rgba(255,255,255,.76)', padding: 15, borderRadius: 22, marginBottom: 15, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#fff', ...shadow }, itemIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(147,197,253,.28)', alignItems: 'center', justifyContent: 'center' }, itemInfo: { flex: 1, marginLeft: 12 }, itemName: { fontSize: 16, fontWeight: '900', color: colors.ink, marginBottom: 5 }, serviceName: { color: colors.muted, fontSize: 12 }, piece: { color: colors.muted, fontSize: 11, fontStyle: 'italic', marginTop: 4 }, attributes: { color: colors.primaryDark, fontSize: 11, fontWeight: '700', marginTop: 5 }, itemBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 9 }, quantity: { minWidth: 82, height: 32, borderRadius: 11, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, quantityText: { color: colors.ink, fontWeight: '900', fontSize: 12 }, itemPrice: { fontSize: 16, fontWeight: 'bold', color: colors.primary }, removeButton: { backgroundColor: 'rgba(184,74,74,.1)', width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   totalContainer: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 20, marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, totalLabel: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: .8 }, totalText: { fontSize: 20, fontWeight: 'bold', color: colors.ink }, checkoutButton: { backgroundColor: colors.primary, paddingVertical: 15, paddingHorizontal: 22, borderRadius: 18, flexDirection: 'row', gap: 8, alignItems: 'center' }, checkoutButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' }, disabledButton: { backgroundColor: '#95a5a6' },
 });

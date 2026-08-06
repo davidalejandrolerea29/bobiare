@@ -6,6 +6,7 @@ import {
   ViewStyle,
   StyleProp,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { colors, shadow } from '../theme';
 
@@ -34,7 +35,9 @@ export function AppBackground({ children }: { children: ReactNode }) {
         pointerEvents="none"
         className="absolute right-20 top-28 h-1.5 w-1.5 rounded-full bg-blue-400/70"
       />
-      {children}
+      <SafeAreaView className="flex-1" edges={['top', 'bottom']}>
+        {children}
+      </SafeAreaView>
     </View>
   );
 }

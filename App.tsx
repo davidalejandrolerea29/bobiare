@@ -13,6 +13,7 @@ import ProductDetailScreen from './screens/ProductDetailScreen';
 import CartScreen from './screens/CartScreen';
 import CheckoutScreen from './screens/CheckoutScreen';
 import ThankYouScreen from './screens/ThankYouScreen';
+import PaymentConfirmationScreen from './screens/PaymentConfirmationScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import ClientHomeScreen from './screens/ClientHomeScreen';
@@ -51,6 +52,7 @@ function RootStack() {
       <Stack.Screen name="Cart" component={CartScreen} />
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
       <Stack.Screen name="ThankYou" component={ThankYouScreen} />
+      <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} />
     </Stack.Navigator>
   );
 }
@@ -76,7 +78,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <View style={styles.container}>
-        <NavigationContainer>
+        <NavigationContainer linking={{
+          prefixes: ['bobiare://', 'https://bobiare.n7softwares.com'],
+          config: { screens: { PaymentConfirmation: 'confirmacion/:orderId' } },
+        }}>
           <RootStack />
         </NavigationContainer>
         <NotificationHost />

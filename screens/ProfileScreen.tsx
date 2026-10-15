@@ -8,6 +8,7 @@ import BottomNav from '../components/BottomNav';
 import { colors } from '../theme';
 import { ApiUser } from '../types/types';
 import { getCurrentUser, getErrorMessage, getStoredUser, logout } from '../utils/api';
+import { activatePush, deactivatePush, pushStatus } from '../utils/pushNotifications';
 import { FadeInView, ListSkeleton } from '../components/MotionUI';
 
 const initials = (name?: string) =>
@@ -22,6 +23,9 @@ export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<ApiUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pushAvailable, setPushAvailable] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
 
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
@@ -37,7 +41,34 @@ export default function ProfileScreen({ navigation }: any) {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    load();
+    void pushStatus().then(status => {
+      setPushAvailable(status.available);
+      setPushEnabled(status.enabled);
+    }).catch(() => setPushAvailable(false));
+  }, [load]));
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    try {
+      if (pushEnabled) {
+        await deactivatePush();
+        setPushEnabled(false);
+        Toast.show({ type: 'success', text1: 'Avisos desactivados en este dispositivo' });
+      } else {
+        const enabled = await activatePush();
+        setPushEnabled(enabled);
+        Toast.show(enabled
+          ? { type: 'success', text1: 'Avisos activados en este dispositivo' }
+          : { type: 'info', text1: 'Permití los avisos para activarlos' });
+      }
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'No pudimos cambiar los avisos', text2: getErrorMessage(error) });
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -50,7 +81,7 @@ export default function ProfileScreen({ navigation }: any) {
   const options = [
     { icon: 'account-edit-outline', label: 'Datos personales', note: phone || 'Teléfono no informado' },
     { icon: 'map-marker-outline', label: 'Direcciones de entrega', note: user?.addresses?.length ? `${user.addresses.length} dirección(es) guardada(s)` : 'Sin direcciones guardadas' },
-    { icon: 'bell-outline', label: 'Notificaciones', note: 'Novedades de tus pedidos' },
+    { icon: 'bell-outline', label: 'Notificaciones', note: !pushAvailable ? 'Requiere la app instalada' : pushEnabled ? 'Activadas en este dispositivo' : 'Tocá para activar los avisos' },
     { icon: 'shield-check-outline', label: 'Seguridad', note: verified ? 'Correo verificado' : 'Cuenta activa' },
   ];
 
@@ -59,7 +90,7 @@ export default function ProfileScreen({ navigation }: any) {
       <Text style={styles.eyebrow}>MI CUENTA</Text><Text style={styles.title}>Perfil</Text>
       {loading && !user ? <ListSkeleton rows={3}/> : <>
         <FadeInView><GlassCard style={styles.user}><View style={styles.avatar}><Text style={styles.initials}>{initials(user?.name)}</Text></View><View style={styles.userText}><Text style={styles.name}>{user?.name || 'Cliente Bobiare'}</Text><Text style={styles.email}>{user?.email || 'Email no disponible'}</Text><View style={styles.verified}><Icon name={verified ? 'check-decagram' : 'account-check-outline'} size={13} color={colors.primary}/><Text style={styles.verifiedText}>{verified ? 'Correo verificado' : 'Cuenta activa'}{role ? ` · ${role}` : ''}</Text></View></View></GlassCard></FadeInView>
-        <FadeInView index={1}><View style={styles.options}>{options.map((item, index) => <TouchableOpacity key={item.label} style={[styles.option, index === options.length - 1 && { borderBottomWidth: 0 }]}><View style={styles.optionIcon}><Icon name={item.icon as React.ComponentProps<typeof Icon>['name']} size={21} color={colors.primary}/></View><View style={styles.optionText}><Text style={styles.optionLabel}>{item.label}</Text><Text style={styles.optionNote}>{item.note}</Text></View><Icon name="chevron-right" size={21} color="#9AA6AC"/></TouchableOpacity>)}</View></FadeInView>
+        <FadeInView index={1}><View style={styles.options}>{options.map((item, index) => <TouchableOpacity key={item.label} style={[styles.option, index === options.length - 1 && { borderBottomWidth: 0 }]} onPress={item.label === 'Notificaciones' ? togglePush : undefined} disabled={item.label === 'Notificaciones' && (!pushAvailable || pushBusy)}><View style={styles.optionIcon}><Icon name={item.icon as React.ComponentProps<typeof Icon>['name']} size={21} color={colors.primary}/></View><View style={styles.optionText}><Text style={styles.optionLabel}>{item.label}</Text><Text style={styles.optionNote}>{item.note}</Text></View><Icon name="chevron-right" size={21} color="#9AA6AC"/></TouchableOpacity>)}</View></FadeInView>
       </>}
       <TouchableOpacity style={styles.whatsapp} onPress={() => Linking.openURL('https://wa.me/5493510000000?text=Hola,%20necesito%20ayuda%20con%20Bobiare')}><Icon name="whatsapp" size={25} color="#fff"/><View style={styles.helpCopy}><Text style={styles.whatsappTitle}>¿Necesitás ayuda?</Text><Text style={styles.whatsappNote}>Hablemos por WhatsApp</Text></View><Icon name="arrow-top-right" size={20} color="#fff"/></TouchableOpacity>
       <TouchableOpacity style={styles.logout} onPress={handleLogout}><Icon name="logout" size={19} color={colors.danger}/><Text style={styles.logoutText}>Cerrar sesión</Text></TouchableOpacity>

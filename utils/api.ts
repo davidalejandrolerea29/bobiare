@@ -497,6 +497,14 @@ export async function getRoles(): Promise<ApiRole[]> {
 
 export async function logout() {
   try {
+    const { removePushRegistrationForLogout } = await import('./pushNotifications');
+    await removePushRegistrationForLogout();
+  } catch {
+    // Cerrar la sesión aunque el dispositivo no tenga conexión con FCM.
+  }
+  const { clearPendingPushNavigation } = await import('./pushNavigation');
+  clearPendingPushNavigation();
+  try {
     await api.get('/auth/logout');
   } catch {
     // Aunque el servidor no responda, la sesión local debe cerrarse.
@@ -504,6 +512,26 @@ export async function logout() {
     await AsyncStorage.multiRemove([STORAGE_KEYS.accessToken, STORAGE_KEYS.tokenExpiresAt, STORAGE_KEYS.user]);
     setAuthState(false);
   }
+}
+
+export async function registerPushToken(token: string) {
+  await api.post('/push/installations', { token });
+}
+
+export async function unregisterPushToken(token: string) {
+  await api.delete('/push/installations', { data: { token } });
+}
+
+export async function getAuthenticatedAccessToken() {
+  const token = await AsyncStorage.getItem(STORAGE_KEYS.accessToken);
+  if (!token) throw new Error('Iniciá sesión para descargar tu factura.');
+  const expiresAt = Number(await AsyncStorage.getItem(STORAGE_KEYS.tokenExpiresAt));
+  if (expiresAt && expiresAt - Date.now() < 60_000) {
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) throw new Error('La sesión venció. Iniciá sesión nuevamente.');
+    return refreshed;
+  }
+  return token;
 }
 
 export async function getStoredUser(): Promise<ApiUser | null> {

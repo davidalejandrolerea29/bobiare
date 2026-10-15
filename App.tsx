@@ -26,6 +26,8 @@ import { NotificationHost } from './utils/notify';
 import { AppLoading } from './components/MotionUI';
 import NativeMainTabs from './components/NativeMainTabs';
 import LaunchScreen from './screens/LaunchScreen';
+import PushCoordinator from './components/PushCoordinator';
+import { flushPushNavigation, navigationRef } from './utils/pushNavigation';
 
 const Stack = createNativeStackNavigator();
 const AuthenticatedHome = withAuthentication(ClientHomeScreen);
@@ -85,13 +87,14 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <View style={styles.container}>
-        <NavigationContainer linking={{
+        <NavigationContainer ref={navigationRef} onReady={flushPushNavigation} onStateChange={flushPushNavigation} linking={{
           prefixes: ['bobiare://', 'https://bobiare.n7softwares.com'],
           config: { screens: { PaymentConfirmation: 'confirmacion/:orderId' } },
         }}>
           <RootStack />
         </NavigationContainer>
         <NotificationHost />
+        <PushCoordinator />
       </View>
     </SafeAreaProvider>
   );

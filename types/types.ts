@@ -103,6 +103,10 @@ export type Order = {
     changed_by_user_id?: number;
     created_at?: string;
   }>;
+  afip_invoices?: Array<{
+    status: string;
+    environment: string;
+  }>;
   user?: { id: number; name: string; email: string };
 };
 
@@ -139,7 +143,7 @@ export type ClientTabsParamList = {
   ClientHome: undefined;
   Catalog: undefined;
   Identify: undefined;
-  Orders: undefined;
+  Orders: { orderId?: number } | undefined;
   Profile: undefined;
 };
 
@@ -151,7 +155,7 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<ClientTabsParamList> | undefined;
   ClientHome: undefined;
   Identify: undefined;
-  Orders: undefined;
+  Orders: { orderId?: number } | undefined;
   Profile: undefined;
   AdminDashboard: undefined;
   Catalog: undefined;

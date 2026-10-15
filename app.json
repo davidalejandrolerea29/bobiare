@@ -13,6 +13,8 @@
   },
   "android": {
     "package": "com.bobiare",
+    "googleServicesFile": "./google-services.json",
+    "permissions": ["android.permission.POST_NOTIFICATIONS"],
     "intentFilters": [
       {
         "action": "VIEW",
@@ -37,12 +39,17 @@
   },
   "ios": {
     "bundleIdentifier": "com.bobiare",
+    "googleServicesFile": "./GoogleService-Info.plist",
+    "entitlements": {
+      "aps-environment": "production"
+    },
     "associatedDomains": [
       "applinks:bobiare.n7softwares.com",
       "applinks:bobiare.n7softwares.com"
     ],
     "infoPlist": {
-      "ITSAppUsesNonExemptEncryption": false
+      "ITSAppUsesNonExemptEncryption": false,
+      "UIBackgroundModes": ["remote-notification"]
     }
   },
   "plugins": [
@@ -54,6 +61,16 @@
         "photosPermission": "Bobiare necesita acceder a tus fotos para analizar la pieza.",
         "cameraPermission": "Bobiare necesita usar la cámara para fotografiar la pieza.",
         "microphonePermission": false
+      }
+    ],
+    "@react-native-firebase/app",
+    "@react-native-firebase/messaging",
+    [
+      "expo-build-properties",
+      {
+        "ios": {
+          "useFrameworks": "dynamic"
+        }
       }
     ]
   ],

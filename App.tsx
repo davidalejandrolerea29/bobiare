@@ -1,6 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -24,6 +24,8 @@ import { colors } from './theme';
 import { withAuthentication } from './components/ProtectedScreen';
 import { NotificationHost } from './utils/notify';
 import { AppLoading } from './components/MotionUI';
+import NativeMainTabs from './components/NativeMainTabs';
+import LaunchScreen from './screens/LaunchScreen';
 
 const Stack = createNativeStackNavigator();
 const AuthenticatedHome = withAuthentication(ClientHomeScreen);
@@ -31,14 +33,19 @@ const AuthenticatedIdentify = withAuthentication(IdentifyScreen);
 const AuthenticatedOrders = withAuthentication(OrdersScreen);
 const AuthenticatedProfile = withAuthentication(ProfileScreen);
 const AuthenticatedAdmin = withAuthentication(AdminDashboardScreen, 'Login');
+const AuthenticatedNativeTabs = withAuthentication(NativeMainTabs);
 
 function RootStack() {
   return (
-    <Stack.Navigator initialRouteName="Catalog" screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: colors.background } }}>
+    <Stack.Navigator initialRouteName="Launch" screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: colors.background } }}>
+      <Stack.Screen name="Launch" component={LaunchScreen} />
       <Stack.Screen name="Catalog" component={CatalogScreen} />
       <Stack.Screen name="Login" component={HomeScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      {Platform.OS === 'ios' ? (
+        <Stack.Screen name="MainTabs" component={AuthenticatedNativeTabs} />
+      ) : null}
       <Stack.Screen name="ClientHome" component={AuthenticatedHome} />
       <Stack.Screen name="Identify" component={AuthenticatedIdentify} />
       <Stack.Screen name="Orders" component={AuthenticatedOrders} />

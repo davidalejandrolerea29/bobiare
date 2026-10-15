@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -52,8 +52,8 @@ export default function ThankYouScreen() {
       <View style={styles.orderSummary}><Text style={styles.summaryTitle}>Resumen del pedido</Text><Text style={styles.orderNumber}>Orden #{orderDetails.orderId}</Text>{orderDetails.email && <Text style={styles.detail}>Email: {orderDetails.email}</Text>}<Text style={styles.status}>Estado: {paid ? 'pago acreditado' : 'pendiente de pago'}</Text><Text style={styles.total}>Total: {formatPrice(orderDetails.total)}</Text></View>
       {!paid && <TouchableOpacity style={styles.payButton} onPress={pay} disabled={paying}>{paying ? <ActivityIndicator color="#fff"/> : <><Icon name="credit-card-outline" size={21} color="#fff"/><Text style={styles.buttonText}>Pagar con Mercado Pago</Text></>}</TouchableOpacity>}
       <View style={styles.instructionsContainer}><Text style={styles.instructionsTitle}>Próximos pasos</Text><Text style={styles.instruction}>1. Aboná el total con Mercado Pago.</Text><Text style={styles.instruction}>2. Al volver, verificaremos la acreditación del pago.</Text><Text style={styles.instruction}>3. Con el pedido pagado, despachá la pieza y cargá el tracking en “Mis pedidos”.</Text></View>
-      <TouchableOpacity style={styles.button} onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Orders' }] })}><Text style={styles.buttonText}>Ver mis pedidos</Text></TouchableOpacity>
-      <TouchableOpacity style={styles.secondary} onPress={() => navigation.navigate('Catalog')}><Text style={styles.secondaryText}>Volver al catálogo</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={() => navigation.reset({ index: 0, routes: [Platform.OS === 'ios' ? { name: 'MainTabs', params: { screen: 'Orders' } } : { name: 'Orders' }] })}><Text style={styles.buttonText}>Ver mis pedidos</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.secondary} onPress={() => Platform.OS === 'ios' ? navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Catalog' } }] }) : navigation.navigate('Catalog')}><Text style={styles.secondaryText}>Volver al catálogo</Text></TouchableOpacity>
     </View>
   </ScrollView></AppBackground>;
 }

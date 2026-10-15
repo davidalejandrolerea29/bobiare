@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { Platform, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { NavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { RootStackParamList } from '../types/types';
 import { colors, shadow } from '../theme';
 import { isAuthenticated } from '../utils/api';
 import { useAuthState } from '../utils/authState';
+import { NativeGlass } from './NativeGlass';
 
 type IconName = React.ComponentProps<typeof Icon>['name'];
 
@@ -30,14 +31,27 @@ export default function BottomNav({ active }: { active: string }) {
   const insets = useSafeAreaInsets();
 
   useFocusEffect(useCallback(() => {
-    if (authenticated === null) isAuthenticated();
+    if (authenticated === null) {
+      isAuthenticated();
+    }
   }, [authenticated]));
 
-  if (authenticated !== true) return null;
+  if (authenticated !== true) {
+    return null;
+  }
+
+  // iOS uses UITabBarController through NativeMainTabs. Android intentionally
+  // keeps this custom branded navigation bar.
+  if (Platform.OS === 'ios') {
+    return null;
+  }
 
   return (
-    <View
-      className="absolute left-3.5 right-3.5 h-[74px] flex-row items-center rounded-[26px] border border-white bg-white/90 px-1.5"
+    <NativeGlass
+      interactive
+      fallbackColor="rgba(255,255,255,0.90)"
+      tintColor="rgba(240,247,255,0.24)"
+      className="absolute left-3.5 right-3.5 h-[74px] flex-row items-center overflow-hidden rounded-[26px] border border-white px-1.5"
       style={[shadow, { bottom: insets.bottom + 10 }]}>
       <View
         pointerEvents="none"
@@ -81,6 +95,6 @@ export default function BottomNav({ active }: { active: string }) {
           </TouchableOpacity>
         );
       })}
-    </View>
+    </NativeGlass>
   );
 }

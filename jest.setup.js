@@ -12,3 +12,13 @@ jest.mock('@expo/vector-icons', () => ({
 jest.mock('expo-font', () => ({
   useFonts: () => [true, null],
 }));
+
+jest.mock('expo-glass-effect', () => {
+  const { View } = require('react-native');
+  return {
+    GlassView: View,
+    GlassContainer: View,
+    isGlassEffectAPIAvailable: () => false,
+    isLiquidGlassAvailable: () => false,
+  };
+});

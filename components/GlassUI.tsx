@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { colors, shadow } from '../theme';
+import { NativeGlass } from './NativeGlass';
 
 type IconName = React.ComponentProps<typeof Icon>['name'];
 
@@ -50,8 +51,10 @@ export function GlassCard({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <View
-      className="overflow-hidden rounded-3xl border border-white/90 bg-white/65"
+    <NativeGlass
+      className="overflow-hidden rounded-3xl border border-white/90"
+      fallbackColor="rgba(255,255,255,0.65)"
+      tintColor="rgba(234,244,255,0.14)"
       style={[shadow, style]}>
       <View
         pointerEvents="none"
@@ -62,7 +65,7 @@ export function GlassCard({
         className="absolute -right-12 -top-16 h-32 w-32 rounded-full bg-white/35"
       />
       {children}
-    </View>
+    </NativeGlass>
   );
 }
 

@@ -1,3 +1,5 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 export type DeliveryTime = {
   id: number;
   description: string;
@@ -133,10 +135,20 @@ export type CheckoutDetails = {
   email?: string;
 };
 
+export type ClientTabsParamList = {
+  ClientHome: undefined;
+  Catalog: undefined;
+  Identify: undefined;
+  Orders: undefined;
+  Profile: undefined;
+};
+
 export type RootStackParamList = {
+  Launch: undefined;
   Login: { returnToCheckout?: boolean } | undefined;
   Register: undefined;
   ForgotPassword: undefined;
+  MainTabs: NavigatorScreenParams<ClientTabsParamList> | undefined;
   ClientHome: undefined;
   Identify: undefined;
   Orders: undefined;

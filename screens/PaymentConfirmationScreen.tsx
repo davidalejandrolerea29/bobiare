@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -49,7 +49,7 @@ export default function PaymentConfirmationScreen() {
     <GlassCard style={styles.summary}><Text style={styles.order}>Pedido #{orderId}</Text>{total > 0 && <Text style={styles.total}>{formatPrice(total)}</Text>}<Text style={styles.status}>{paid ? 'Pagado' : 'Pendiente de confirmación'}</Text></GlassCard>
     {loading ? <ActivityIndicator color={colors.primary} size="large"/> : error ? <Text style={styles.error}>{error}</Text> : !paid && attempt < 3 ? <ActivityIndicator color={colors.primary}/> : null}
     {!paid && <TouchableOpacity style={styles.retry} onPress={() => { setLoading(true); setAttempt(current => current + 1); }}><Text style={styles.retryText}>Verificar nuevamente</Text></TouchableOpacity>}
-    <TouchableOpacity style={styles.button} onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Orders' }] })}><Text style={styles.buttonText}>Ir a mis pedidos</Text></TouchableOpacity>
+    <TouchableOpacity style={styles.button} onPress={() => navigation.reset({ index: 0, routes: [Platform.OS === 'ios' ? { name: 'MainTabs', params: { screen: 'Orders' } } : { name: 'Orders' }] })}><Text style={styles.buttonText}>Ir a mis pedidos</Text></TouchableOpacity>
   </View></AppBackground>;
 }
 

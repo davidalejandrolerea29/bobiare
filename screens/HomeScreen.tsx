@@ -38,7 +38,16 @@ export default function LoginScreen({ navigation, route }: { navigation: Navigat
       const role = user?.rol_id ?? user?.role_id ?? roleObject?.id;
       const roleName = String(roleObject?.name ?? user?.role ?? '').toLowerCase();
       const isStaff = [1, 2, 3, 4].includes(role ?? -1) || ['admin', 'administrator', 'administrador', 'gerente general', 'stock', 'finanzas'].includes(roleName);
-      navigation.reset({ index: 0, routes: [{ name: isStaff ? 'AdminDashboard' : 'ClientHome' }] });
+      navigation.reset({
+        index: 0,
+        routes: [{
+          name: isStaff
+            ? 'AdminDashboard'
+            : Platform.OS === 'ios'
+              ? 'MainTabs'
+              : 'ClientHome',
+        }],
+      });
     } catch (error) {
       Toast.show({ type: 'error', text1: getErrorMessage(error, 'No se pudo iniciar sesión') });
     } finally {

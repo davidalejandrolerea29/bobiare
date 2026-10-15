@@ -1,6 +1,7 @@
 # Bobiare
 
-Aplicación móvil Expo SDK 54 compatible con Expo Go.
+Aplicación móvil Expo SDK 54. Android puede ejecutarse con Expo Go. La
+navegación Liquid Glass nativa de iOS requiere un development build.
 
 ## Ejecutar con Expo Go
 
@@ -14,11 +15,10 @@ npm start
 Escaneá el QR desde Expo Go. Este comando fuerza el runtime de Expo Go aunque
 `expo-dev-client` esté instalado.
 
-Para abrir un emulador:
+Para abrir Android:
 
 ```sh
 npm run android
-npm run ios
 ```
 
 Si Metro conserva datos de una ejecución anterior:
@@ -44,6 +44,25 @@ npm run start:dev
 El QR abrirá la APK de Bobiare instalada. No es necesario reconstruir la APK
 por cambios de JavaScript o TypeScript; solo cuando cambian módulos o
 configuraciones nativas.
+
+### iOS 26 y Liquid Glass
+
+Expo Go no incluye la versión de `react-native-screens` que necesita la barra
+de pestañas UIKit de esta app. Generá e instalá un development build de iOS:
+
+```sh
+npm run build:dev:ios
+```
+
+Después de instalarlo en el dispositivo, iniciá Metro con:
+
+```sh
+npm run ios
+```
+
+Si ya había un development build instalado antes de agregar o actualizar los
+módulos nativos, desinstalalo primero. Una recarga de Metro u OTA no reemplaza
+los módulos compilados dentro de la aplicación.
 
 ## API de Bobiare
 

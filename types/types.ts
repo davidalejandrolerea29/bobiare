@@ -85,6 +85,10 @@ export type Order = {
   id: number;
   user_id?: number;
   status: string;
+  has_service?: boolean;
+  piece_received_at?: string | null;
+  payment_ready?: boolean;
+  service_start_date?: string | null;
   total: number;
   created_at?: string;
   items: CartItem[];
@@ -137,6 +141,8 @@ export type CheckoutDetails = {
   orderId: number;
   status: string;
   total: number;
+  hasService?: boolean;
+  paymentReady?: boolean;
   email?: string;
 };
 

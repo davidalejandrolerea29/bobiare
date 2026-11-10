@@ -26,7 +26,6 @@ export default function CheckoutScreen() {
     billingDocumentType: '' as '' | 'cuit' | 'dni',
     billingDocumentNumber: '', billingName: '',
     billingIvaCondition: 'consumer_final' as 'consumer_final' | 'registered' | 'monotributo' | 'exempt',
-    serviceStartDate: '', serviceEndDate: '',
   });
 
   useEffect(() => {
@@ -66,12 +65,6 @@ export default function CheckoutScreen() {
       Toast.show({ type: 'error', text1: 'Completá el nombre del titular del CUIT' });
       return;
     }
-    if (hasService && (!/^\d{4}-\d{2}-\d{2}$/.test(form.serviceStartDate)
-      || !/^\d{4}-\d{2}-\d{2}$/.test(form.serviceEndDate)
-      || form.serviceEndDate < form.serviceStartDate)) {
-      Toast.show({ type: 'error', text1: 'Ingresá el período acordado con BOBIARE (AAAA-MM-DD)' });
-      return;
-    }
     setLoading(true);
     try {
       const order = await checkout({
@@ -90,12 +83,11 @@ export default function CheckoutScreen() {
           billing_name: form.billingName.trim() || undefined,
           billing_iva_condition: form.billingDocumentType === 'cuit' ? form.billingIvaCondition : 'consumer_final',
         } : {}),
-        ...(hasService ? { service_start_date: form.serviceStartDate, service_end_date: form.serviceEndDate } : {}),
         ...(!authenticated ? { name: form.name.trim(), email: form.email.trim().toLowerCase(), password: form.password } : {}),
       });
       navigation.reset({
         index: 0,
-        routes: [{ name: 'ThankYou', params: { orderDetails: { orderId: order.id, status: order.status, total: order.total, email: form.email || undefined } } }],
+        routes: [{ name: 'ThankYou', params: { orderDetails: { orderId: order.id, status: order.status, total: order.total, hasService: order.has_service, paymentReady: order.payment_ready, email: form.email || undefined } } }],
       });
     } catch (error) {
       if (getStatusCode(error) === 409) {
@@ -152,10 +144,8 @@ export default function CheckoutScreen() {
         </>}
       </View>
       {hasService && <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Período del servicio</Text>
-        <Text style={styles.help}>Indicá las fechas de prestación acordadas con BOBIARE. Figurarán en la factura.</Text>
-        {field('serviceStartDate', 'Desde (AAAA-MM-DD)', { autoCapitalize: 'none' })}
-        {field('serviceEndDate', 'Hasta (AAAA-MM-DD)', { autoCapitalize: 'none' })}
+        <Text style={styles.sectionTitle}>Servicio sobre tu pieza</Text>
+        <Text style={styles.help}>Confirmá el pedido y envianos la pieza. Cuando llegue al taller, acordaremos las fechas de trabajo y te avisaremos para pagar el total. El plazo publicado es estimado.</Text>
       </View>}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Dirección de envío</Text>
@@ -174,7 +164,7 @@ export default function CheckoutScreen() {
         {field('postalCode', 'Código postal', { keyboardType: 'numeric' })}
         {field('notes', 'Notas para el pedido (opcional)', { multiline: true })}
       </View>
-      <View style={styles.totalContainer}><Text style={styles.totalLabel}>TOTAL CALCULADO POR EL SERVIDOR</Text><Text style={styles.totalText}>{formatPrice(total)}</Text><Text style={styles.help}>Después de confirmar el pedido vas a poder abonar el total con Mercado Pago.</Text></View>
+      <View style={styles.totalContainer}><Text style={styles.totalLabel}>TOTAL CALCULADO POR EL SERVIDOR</Text><Text style={styles.totalText}>{formatPrice(total)}</Text><Text style={styles.help}>{hasService ? 'El pago total se habilita cuando el taller recibe tu pieza y acuerda las fechas.' : 'Después de confirmar el pedido vas a poder abonar el total con Mercado Pago.'}</Text></View>
       <TouchableOpacity style={[styles.paymentButton, loading && styles.disabled]} onPress={submit} disabled={loading}>{loading ? <ActivityIndicator color="#fff"/> : <><Icon name="check-circle-outline" size={20} color="#fff"/><Text style={styles.paymentButtonText}>Confirmar pedido</Text></>}</TouchableOpacity>
     </ScrollView>
   </KeyboardAvoidingView></AppBackground>;

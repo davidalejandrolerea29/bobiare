@@ -6,12 +6,12 @@ import Toast from '../utils/notify';
 import { AppBackground, GlassCard } from '../components/GlassUI';
 import { colors, formatPrice } from '../theme';
 import { Order } from '../types/types';
-import { getAdminOrders, getErrorMessage, logout, receiveOrder, registerDeposit } from '../utils/api';
+import { confirmServicePeriod, getAdminOrders, getErrorMessage, logout, receiveOrder } from '../utils/api';
 import { FadeInView, ListSkeleton } from '../components/MotionUI';
 
 const filters = [
-  ['all', 'Todos'], ['pending_payment', 'Esperando seña'],
-  ['deposit_paid', 'Seña paga'], ['shipped_by_customer', 'En camino'], ['received', 'Recibidos'],
+  ['all', 'Todos'], ['pending_payment', 'Por pagar'],
+  ['paid', 'Pagados'], ['shipped_by_customer', 'En camino'], ['received', 'Recibidos'],
 ] as const;
 
 export default function AdminDashboardScreen({ navigation }: any) {
@@ -21,6 +21,7 @@ export default function AdminDashboardScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notes, setNotes] = useState<Record<number, string>>({});
+  const [periods, setPeriods] = useState<Record<number, { start: string; end: string }>>({});
   const [working, setWorking] = useState<number | null>(null);
 
   const load = useCallback(async (refresh = false) => {
@@ -38,14 +39,19 @@ export default function AdminDashboardScreen({ navigation }: any) {
   }, [status]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const deposit = async (order: Order) => {
+  const setPeriod = async (order: Order) => {
+    const period = periods[order.id];
+    if (!period?.start || !period?.end || period.end < period.start) {
+      Toast.show({ type: 'error', text1: 'Indicá un período válido (AAAA-MM-DD)' });
+      return;
+    }
     setWorking(order.id);
     try {
-      await registerDeposit(order.id, order.total / 2, 'transferencia');
-      Toast.show({ type: 'success', text1: `Seña del pedido #${order.id} registrada` });
+      await confirmServicePeriod(order.id, period.start, period.end);
+      Toast.show({ type: 'success', text1: `Pago total habilitado para el pedido #${order.id}` });
       await load();
     } catch (error) {
-      Toast.show({ type: 'error', text1: getErrorMessage(error, 'No se pudo registrar la seña') });
+        Toast.show({ type: 'error', text1: getErrorMessage(error, 'No se pudo confirmar el período') });
     } finally {
       setWorking(null);
     }
@@ -79,8 +85,9 @@ export default function AdminDashboardScreen({ navigation }: any) {
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{filters.map(([key, label]) => <TouchableOpacity key={key} style={[styles.filter, status === key && styles.filterActive]} onPress={() => setStatus(key)}><Text style={[styles.filterText, status === key && styles.filterTextActive]}>{label}</Text></TouchableOpacity>)}</ScrollView>
     {loading ? <ListSkeleton rows={4}/> : !orders.length ? <Text style={styles.empty}>No hay pedidos con este estado.</Text> : orders.map((order, index) => <FadeInView key={order.id} index={index}><GlassCard style={styles.order}>
       <View style={styles.orderTop}><View style={styles.orderIcon}><Icon name="package-variant-closed" size={24} color={colors.primary}/></View><View style={styles.orderInfo}><Text style={styles.orderId}>PEDIDO #{order.id}</Text><Text style={styles.orderItem}>{order.items?.[0]?.product_name_snapshot || 'Pedido Bobiare'}</Text><Text style={styles.orderUser}>{order.user?.name || order.user?.email || 'Cliente'} · {formatPrice(order.total)}</Text></View><Text style={styles.orderState}>{order.status}</Text></View>
-      {order.status === 'pending_payment' && <View style={styles.actionBox}><Text style={styles.actionTitle}>Registrar seña del 50%</Text><Text style={styles.actionHelp}>Transferencia por {formatPrice(order.total / 2)}</Text><TouchableOpacity style={styles.button} onPress={() => deposit(order)} disabled={working === order.id}>{working === order.id ? <ActivityIndicator color="#fff"/> : <Text style={styles.buttonText}>Confirmar seña</Text>}</TouchableOpacity></View>}
-      {order.status === 'shipped_by_customer' && <View style={styles.actionBox}><Text style={styles.actionTitle}>Recepción en taller</Text>{order.shipments?.[0]?.tracking_number && <Text style={styles.actionHelp}>Tracking: {order.shipments[0].tracking_number}</Text>}<TextInput style={styles.noteInput} placeholder="Estado en que llegó la pieza" value={notes[order.id] || ''} onChangeText={value => setNotes(current => ({ ...current, [order.id]: value }))}/><TouchableOpacity style={styles.button} onPress={() => receive(order)} disabled={working === order.id}>{working === order.id ? <ActivityIndicator color="#fff"/> : <Text style={styles.buttonText}>Marcar como recibido</Text>}</TouchableOpacity></View>}
+      {order.has_service && order.status === 'pending_payment' && !order.piece_received_at && <View style={styles.actionBox}><Text style={styles.actionHelp}>Esperando la pieza. El pago total se habilita al confirmar las fechas.</Text></View>}
+      {((order.has_service && order.status === 'pending_payment' && !order.piece_received_at) || order.status === 'shipped_by_customer' || (order.status === 'paid' && !order.has_service)) && <View style={styles.actionBox}><Text style={styles.actionTitle}>Recepción en taller</Text>{order.shipments?.[0]?.tracking_number && <Text style={styles.actionHelp}>Tracking: {order.shipments[0].tracking_number}</Text>}<TextInput style={styles.noteInput} placeholder="Estado en que llegó la pieza" value={notes[order.id] || ''} onChangeText={value => setNotes(current => ({ ...current, [order.id]: value }))}/><TouchableOpacity style={styles.button} onPress={() => receive(order)} disabled={working === order.id}>{working === order.id ? <ActivityIndicator color="#fff"/> : <Text style={styles.buttonText}>Marcar como recibido</Text>}</TouchableOpacity></View>}
+      {order.has_service && order.status === 'received' && !order.service_start_date && <View style={styles.actionBox}><Text style={styles.actionTitle}>Fechas acordadas con el cliente</Text><Text style={styles.actionHelp}>Cargalas luego de recibir la pieza. Se habilitará el pago total.</Text><TextInput style={styles.noteInput} placeholder="Desde (AAAA-MM-DD)" value={periods[order.id]?.start || ''} onChangeText={value => setPeriods(current => ({ ...current, [order.id]: { start: value, end: current[order.id]?.end || '' } }))}/><TextInput style={styles.noteInput} placeholder="Hasta (AAAA-MM-DD)" value={periods[order.id]?.end || ''} onChangeText={value => setPeriods(current => ({ ...current, [order.id]: { start: current[order.id]?.start || '', end: value } }))}/><TouchableOpacity style={styles.button} onPress={() => setPeriod(order)} disabled={working === order.id}>{working === order.id ? <ActivityIndicator color="#fff"/> : <Text style={styles.buttonText}>Confirmar fechas y habilitar pago</Text>}</TouchableOpacity></View>}
     </GlassCard></FadeInView>)}
   </ScrollView></AppBackground>;
 }

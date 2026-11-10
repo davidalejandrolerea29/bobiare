@@ -641,17 +641,13 @@ export async function getAdminOrders(status?: string) {
   };
 }
 
-export async function registerDeposit(id: number, amount: number, method: string) {
-  const { data } = await api.post(`/orders/${id}/payments`, {
-    type: 'deposit',
-    amount,
-    method,
-  });
+export async function receiveOrder(id: number, note: string) {
+  const { data } = await api.post(`/admin/orders/${id}/status`, { status: 'received', note });
   return data;
 }
 
-export async function receiveOrder(id: number, note: string) {
-  const { data } = await api.post(`/admin/orders/${id}/receive`, { note });
+export async function confirmServicePeriod(id: number, start: string, end: string) {
+  const { data } = await api.post(`/admin/orders/${id}/service-period`, { service_start_date: start, service_end_date: end });
   return data;
 }
 

@@ -17,16 +17,24 @@ export default function CheckoutScreen() {
   const navigation = useNavigation<Navigation>();
   const [authenticated, setAuthenticated] = useState(false);
   const [total, setTotal] = useState(0);
+  const [hasService, setHasService] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '', email: '', password: '', recipientName: '', phone: '', street: '',
     city: '', province: '', postalCode: '', notes: '',
+    billingDocumentType: '' as '' | 'cuit' | 'dni',
+    billingDocumentNumber: '', billingName: '',
+    billingIvaCondition: 'consumer_final' as 'consumer_final' | 'registered' | 'monotributo' | 'exempt',
+    serviceStartDate: '', serviceEndDate: '',
   });
 
   useEffect(() => {
     Promise.all([isAuthenticated(), getCart()])
-      .then(([logged, cart]) => { setAuthenticated(logged); setTotal(cart.total); })
+      .then(([logged, cart]) => {
+        setAuthenticated(logged); setTotal(cart.total);
+        setHasService(cart.items.some(item => item.fiscal_concept_snapshot === 'service'));
+      })
       .catch(error => Toast.show({ type: 'error', text1: getErrorMessage(error) }));
   }, []);
 
@@ -50,6 +58,20 @@ export default function CheckoutScreen() {
       Toast.show({ type: 'error', text1: 'La contraseña debe tener al menos 8 caracteres' });
       return;
     }
+    if (form.billingDocumentType && !form.billingDocumentNumber.trim()) {
+      Toast.show({ type: 'error', text1: 'Completá el documento para la factura' });
+      return;
+    }
+    if (form.billingDocumentType === 'cuit' && !form.billingName.trim()) {
+      Toast.show({ type: 'error', text1: 'Completá el nombre del titular del CUIT' });
+      return;
+    }
+    if (hasService && (!/^\d{4}-\d{2}-\d{2}$/.test(form.serviceStartDate)
+      || !/^\d{4}-\d{2}-\d{2}$/.test(form.serviceEndDate)
+      || form.serviceEndDate < form.serviceStartDate)) {
+      Toast.show({ type: 'error', text1: 'Ingresá el período acordado con BOBIARE (AAAA-MM-DD)' });
+      return;
+    }
     setLoading(true);
     try {
       const order = await checkout({
@@ -62,6 +84,13 @@ export default function CheckoutScreen() {
           postal_code: form.postalCode.trim(),
         },
         notes: form.notes.trim() || undefined,
+        ...(form.billingDocumentType ? {
+          billing_document_type: form.billingDocumentType,
+          billing_document_number: form.billingDocumentNumber.trim(),
+          billing_name: form.billingName.trim() || undefined,
+          billing_iva_condition: form.billingDocumentType === 'cuit' ? form.billingIvaCondition : 'consumer_final',
+        } : {}),
+        ...(hasService ? { service_start_date: form.serviceStartDate, service_end_date: form.serviceEndDate } : {}),
         ...(!authenticated ? { name: form.name.trim(), email: form.email.trim().toLowerCase(), password: form.password } : {}),
       });
       navigation.reset({
@@ -98,6 +127,37 @@ export default function CheckoutScreen() {
         <Text style={styles.help}>La cuenta se crea automáticamente cuando confirmás el pedido.</Text>
       </View>}
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Datos para la factura</Text>
+        <Text style={styles.help}>Sin documento se emite a Consumidor Final.</Text>
+        <View style={styles.choiceRow}>
+          {([['', 'Consumidor final'], ['dni', 'DNI'], ['cuit', 'CUIT']] as const).map(([value, label]) => (
+            <TouchableOpacity key={label} style={[styles.choice, form.billingDocumentType === value && styles.choiceSelected]}
+              onPress={() => setForm(current => ({ ...current, billingDocumentType: value, billingIvaCondition: 'consumer_final' }))}>
+              <Text>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {!!form.billingDocumentType && field('billingDocumentNumber', `Número de ${form.billingDocumentType.toUpperCase()}`, { keyboardType: 'numeric' })}
+        {!!form.billingDocumentType && field('billingName', 'Nombre / razón social')}
+        {form.billingDocumentType === 'cuit' && <>
+          <Text style={styles.help}>Condición frente al IVA del titular</Text>
+          <View style={styles.choiceRow}>
+            {([['consumer_final', 'Consumidor final'], ['registered', 'Responsable inscripto'], ['monotributo', 'Monotributista'], ['exempt', 'Exento']] as const).map(([value, label]) => (
+              <TouchableOpacity key={value} style={[styles.choice, form.billingIvaCondition === value && styles.choiceSelected]}
+                onPress={() => setForm(current => ({ ...current, billingIvaCondition: value }))}>
+                <Text>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>}
+      </View>
+      {hasService && <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Período del servicio</Text>
+        <Text style={styles.help}>Indicá las fechas de prestación acordadas con BOBIARE. Figurarán en la factura.</Text>
+        {field('serviceStartDate', 'Desde (AAAA-MM-DD)', { autoCapitalize: 'none' })}
+        {field('serviceEndDate', 'Hasta (AAAA-MM-DD)', { autoCapitalize: 'none' })}
+      </View>}
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Dirección de envío</Text>
         {field('recipientName', 'Nombre de quien recibe')}
         {field('phone', 'Teléfono', { keyboardType: 'phone-pad' })}
@@ -125,4 +185,7 @@ const styles = StyleSheet.create({
   section: { marginBottom: 25 }, sectionTitle: { fontSize: 18, fontWeight: '900', marginBottom: 7, color: colors.ink }, help: { color: colors.muted, fontSize: 11, lineHeight: 16, marginBottom: 12 }, input: { backgroundColor: 'rgba(255,255,255,.76)', padding: 15, borderRadius: 17, marginBottom: 10, borderWidth: 1, borderColor: '#fff', color: colors.ink },
   loginButton: { minHeight: 64, borderRadius: 17, borderWidth: 1, borderColor: 'rgba(18,103,233,.28)', backgroundColor: 'rgba(255,255,255,.62)', paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 11 }, loginCopy: { flex: 1 }, loginTitle: { color: colors.primary, fontWeight: '900' }, loginNote: { color: colors.muted, fontSize: 11, marginTop: 2 }, divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 17 }, line: { flex: 1, height: 1, backgroundColor: colors.line }, dividerText: { color: colors.muted, fontSize: 9, fontWeight: '800', marginHorizontal: 9 },
   totalContainer: { marginVertical: 8, padding: 17, backgroundColor: 'rgba(255,255,255,.8)', borderRadius: 20, borderWidth: 1, borderColor: '#fff', ...shadow }, totalLabel: { color: colors.muted, fontSize: 9, fontWeight: '900', letterSpacing: .7 }, totalText: { fontSize: 24, fontWeight: 'bold', color: colors.ink, marginVertical: 5 }, paymentButton: { backgroundColor: colors.primary, padding: 16, borderRadius: 18, alignItems: 'center', marginVertical: 20, flexDirection: 'row', justifyContent: 'center', gap: 8 }, paymentButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' }, disabled: { opacity: .65 },
+  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  choice: { backgroundColor: 'rgba(255,255,255,.76)', borderRadius: 12, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 12, paddingVertical: 9 },
+  choiceSelected: { borderColor: colors.primary, backgroundColor: '#dcecff' },
 });

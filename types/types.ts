@@ -66,6 +66,7 @@ export type CartItem = {
   selected_attributes?: SelectedAttribute[];
   quantity: number;
   subtotal: number;
+  fiscal_concept_snapshot?: 'goods' | 'service' | null;
   product?: Product;
 };
 

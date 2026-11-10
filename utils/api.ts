@@ -421,6 +421,12 @@ export async function checkout(payload: {
   name?: string;
   email?: string;
   password?: string;
+  billing_document_type?: 'cuit' | 'dni';
+  billing_document_number?: string;
+  billing_name?: string;
+  billing_iva_condition?: 'consumer_final' | 'registered' | 'monotributo' | 'exempt';
+  service_start_date?: string;
+  service_end_date?: string;
 }) {
   const { data } = await api.post('/cart/checkout', payload);
   if (data.access_token) {

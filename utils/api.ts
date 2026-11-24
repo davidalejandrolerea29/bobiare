@@ -10,6 +10,9 @@ export const API_BASE_URL =
 export const AI_ANALYSIS_PATH =
   process.env.EXPO_PUBLIC_AI_ANALYSIS_PATH || '/ai/analyze-piece';
 
+export const GOOGLE_AUTH_PATH =
+  process.env.EXPO_PUBLIC_GOOGLE_AUTH_PATH?.trim() || '/auth/google';
+
 export const STORAGE_KEYS = {
   accessToken: 'bobiare.access_token',
   guestToken: 'bobiare.guest_token',
@@ -34,6 +37,7 @@ const authApi = axios.create({
 });
 
 let refreshPromise: Promise<string | null> | null = null;
+let loggingOut = false;
 
 const persistSession = async (data: any, fallbackUser?: ApiUser) => {
   if (!data.access_token) return;
@@ -44,7 +48,10 @@ const persistSession = async (data: any, fallbackUser?: ApiUser) => {
   const user = data.user || fallbackUser;
   if (user) entries.push([STORAGE_KEYS.user, JSON.stringify(user)]);
   await AsyncStorage.multiSet(entries);
-  setAuthState(true);
+  // La baja puede renovar el JWT para autenticarse, sin reactivar la sesión/UI.
+  if (!loggingOut) {
+    setAuthState(true);
+  }
 };
 
 const refreshAccessToken = async () => {
@@ -441,17 +448,34 @@ export async function checkout(payload: {
   return { ...data, id: number(data.id), total: number(data.total) };
 }
 
-export async function login(email: string, password: string) {
-  const hadGuestCart = Boolean(await AsyncStorage.getItem(STORAGE_KEYS.guestToken));
+const authenticate = async (
+  path: string,
+  credentials: Record<string, string>,
+  useGuestClient = false,
+): Promise<ApiUser> => {
+  const guestToken = await AsyncStorage.getItem(STORAGE_KEYS.guestToken);
+  const hadGuestCart = Boolean(guestToken);
+  const guestHeaders = guestToken ? { 'X-Guest-Token': guestToken } : undefined;
   let guestItems: CartItem[] = [];
   if (hadGuestCart) {
     try {
-      guestItems = (await getCart()).items;
+      if (useGuestClient) {
+        // La sesión anterior no participa del intercambio ni de su carrito invitado.
+        const { data: guestCart } = await authApi.get('/cart', { headers: guestHeaders });
+        guestItems = normalizeCart(guestCart).items;
+      } else {
+        guestItems = (await getCart()).items;
+      }
     } catch {
       // Iniciar sesión sigue siendo posible aunque no se pueda leer el carrito invitado.
     }
   }
-  const { data } = await api.post('/auth/login', { email, password });
+  const { data } = useGuestClient
+    ? await authApi.post(path, credentials, { headers: guestHeaders })
+    : await api.post(path, credentials);
+  if (typeof data?.access_token !== 'string' || !data.access_token.trim()) {
+    throw new Error('El servidor no devolvió una sesión válida. Intentá nuevamente.');
+  }
   await persistSession(data, data.user);
   if (guestItems.length) {
     try {
@@ -477,6 +501,18 @@ export async function login(email: string, password: string) {
   }
   // Compatibilidad con servidores anteriores que devolvían solamente el JWT.
   return getCurrentUser();
+};
+
+export async function login(email: string, password: string) {
+  return authenticate('/auth/login', { email, password });
+}
+
+export async function loginWithGoogle(firebaseIdToken: string) {
+  if (typeof firebaseIdToken !== 'string' || !firebaseIdToken.trim()) {
+    throw new Error('Google no devolvió una credencial válida. Intentá nuevamente.');
+  }
+  // El backend verifica el ID token de Firebase Auth y emite la sesión Bobiare.
+  return authenticate(GOOGLE_AUTH_PATH, { id_token: firebaseIdToken.trim() }, true);
 }
 
 export async function register(name: string, email: string, password: string) {
@@ -502,21 +538,29 @@ export async function getRoles(): Promise<ApiRole[]> {
 }
 
 export async function logout() {
+  // Bloquear renovaciones push desde que comienza la baja, conservando el JWT
+  // para retirar la instalación y cerrar la sesión en el servidor.
+  loggingOut = true;
+  setAuthState(false);
   try {
-    const { removePushRegistrationForLogout } = await import('./pushNotifications');
+    const { removePushRegistrationForLogout } = require('./pushNotifications') as typeof import('./pushNotifications');
     await removePushRegistrationForLogout();
   } catch {
     // Cerrar la sesión aunque el dispositivo no tenga conexión con FCM.
   }
-  const { clearPendingPushNavigation } = await import('./pushNavigation');
+  const { clearPendingPushNavigation } = require('./pushNavigation') as typeof import('./pushNavigation');
   clearPendingPushNavigation();
   try {
     await api.get('/auth/logout');
   } catch {
     // Aunque el servidor no responda, la sesión local debe cerrarse.
   } finally {
-    await AsyncStorage.multiRemove([STORAGE_KEYS.accessToken, STORAGE_KEYS.tokenExpiresAt, STORAGE_KEYS.user]);
-    setAuthState(false);
+    try {
+      await AsyncStorage.multiRemove([STORAGE_KEYS.accessToken, STORAGE_KEYS.tokenExpiresAt, STORAGE_KEYS.user]);
+    } finally {
+      setAuthState(false);
+      loggingOut = false;
+    }
   }
 }
 
@@ -554,11 +598,16 @@ export async function getCurrentUser(): Promise<ApiUser> {
   const { data } = await api.get('/auth/me');
   const user = (data.user || data.data || data) as ApiUser;
   await AsyncStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
-  setAuthState(true);
+  if (!loggingOut) {
+    setAuthState(true);
+  }
   return user;
 }
 
 export async function isAuthenticated() {
+  if (loggingOut) {
+    return false;
+  }
   const token = await AsyncStorage.getItem(STORAGE_KEYS.accessToken);
   if (!token) {
     setAuthState(false);
@@ -566,6 +615,9 @@ export async function isAuthenticated() {
   }
   try {
     await getCurrentUser();
+    if (loggingOut) {
+      return false;
+    }
     setAuthState(true);
     return true;
   } catch {

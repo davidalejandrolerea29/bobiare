@@ -146,23 +146,25 @@ export type CheckoutDetails = {
   email?: string;
 };
 
+export type OrdersRouteParams = { orderId?: number; pushRequestId?: number } | undefined;
+
 export type ClientTabsParamList = {
   ClientHome: undefined;
   Catalog: undefined;
   Identify: undefined;
-  Orders: { orderId?: number } | undefined;
+  Orders: OrdersRouteParams;
   Profile: undefined;
 };
 
 export type RootStackParamList = {
   Launch: undefined;
   Login: { returnToCheckout?: boolean } | undefined;
-  Register: undefined;
+  Register: { returnToCheckout?: boolean } | undefined;
   ForgotPassword: undefined;
   MainTabs: NavigatorScreenParams<ClientTabsParamList> | undefined;
   ClientHome: undefined;
   Identify: undefined;
-  Orders: { orderId?: number } | undefined;
+  Orders: OrdersRouteParams;
   Profile: undefined;
   AdminDashboard: undefined;
   Catalog: undefined;

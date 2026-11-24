@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
+import { RouteProp, useIsFocused, useRoute } from '@react-navigation/native';
 import Toast from '../utils/notify';
 import { AppBackground, GlassCard } from '../components/GlassUI';
 import BottomNav from '../components/BottomNav';
@@ -24,6 +24,7 @@ const statusOrder = ['pending_payment', 'paid', 'shipped_by_customer', 'received
 
 export default function OrdersScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Orders'>>();
+  const isFocused = useIsFocused();
   const [focusedOrderId, setFocusedOrderId] = useState<number | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<'active' | 'completed' | 'all'>('active');
@@ -39,7 +40,7 @@ export default function OrdersScreen() {
       setFocusedOrderId(route.params.orderId);
       setFilter('all');
     }
-  }, [route.params?.orderId]);
+  }, [route.params?.orderId, route.params?.pushRequestId]);
 
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
@@ -56,7 +57,12 @@ export default function OrdersScreen() {
       setRefreshing(false);
     }
   }, []);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useEffect(() => {
+    // Un aviso puede abrir el mismo pedido mientras esta pantalla ya tiene foco.
+    if (isFocused) {
+      load();
+    }
+  }, [isFocused, load, route.params?.orderId, route.params?.pushRequestId]);
 
   const ship = async (order: Order) => {
     const value = (tracking[order.id] || order.shipments?.find(item => item.direction === 'to_workshop')?.tracking_number || '').trim();

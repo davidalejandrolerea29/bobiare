@@ -1,17 +1,50 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, StyleSheet, View } from 'react-native';
+import type { TextInputProps } from 'react-native';
+import type { NavigationProp, RouteProp } from '@react-navigation/native';
 import Toast from '../utils/notify';
 import { AppBackground } from '../components/GlassUI';
 import { colors, shadow } from '../theme';
 import { getErrorMessage, register } from '../utils/api';
 import { FadeInView, SoftAppear } from '../components/MotionUI';
+import GoogleSignInButton from '../components/GoogleSignInButton';
+import { finishLogin } from '../utils/authNavigation';
+import type { RootStackParamList } from '../types/types';
 
-export default function RegisterScreen({ navigation }: any) {
+function RegistrationField({ label, ...inputProps }: TextInputProps & { label: string }) {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={[styles.inputWrap, focused && styles.inputWrapFocused]}>
+        <TextInput
+          {...inputProps}
+          accessibilityLabel={label}
+          style={styles.input}
+          placeholderTextColor={colors.muted}
+          selectionColor={colors.primary}
+          cursorColor={colors.primary}
+          underlineColorAndroid="transparent"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
+      </View>
+    </View>
+  );
+}
+
+export default function RegisterScreen({ navigation, route }: {
+  navigation: NavigationProp<RootStackParamList>;
+  route: RouteProp<RootStackParamList, 'Register'>;
+}) {
 
   const [name, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const pending = useRef(false);
 
   const clearFields = () => {
     setEmail('');
@@ -21,6 +54,7 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   const handleRegister = async () => {
+    if (pending.current) return;
     if (!email || !password || !name || !confirmPassword) {
       Toast.show({ type: 'error', text1: 'Por favor complete todos los campos' });
       return;
@@ -30,6 +64,8 @@ export default function RegisterScreen({ navigation }: any) {
       return;
     }
 
+    pending.current = true;
+    setLoading(true);
     try {
       await register(name.trim(), email.trim().toLowerCase(), password);
       Toast.show({
@@ -40,7 +76,7 @@ export default function RegisterScreen({ navigation }: any) {
         onPress: () => Toast.hide(),
       });
       clearFields();
-      navigation.navigate('Login');
+      navigation.navigate('Login', route.params);
     } catch (error) {
       Toast.show({
         type: 'error',
@@ -48,6 +84,9 @@ export default function RegisterScreen({ navigation }: any) {
         text2: getErrorMessage(error, 'El servidor no devolvió detalles.'),
         visibilityTime: 5000,
       });
+    } finally {
+      pending.current = false;
+      setLoading(false);
     }
   };
 
@@ -64,16 +103,18 @@ export default function RegisterScreen({ navigation }: any) {
           </SoftAppear>
 
           <FadeInView style={styles.form}>
-            <TextInput
-              style={styles.input}
+            <GoogleSignInButton disabled={loading} pendingRef={pending} onLoadingChange={setLoading} onAuthenticated={user => finishLogin(navigation, user, route.params?.returnToCheckout)} />
+            <Text style={styles.separator}>O registrate con tu correo</Text>
+            <RegistrationField
+              label="Nombre completo"
               placeholder="Nombre completo"
               value={name}
               onChangeText={setNombre}
               returnKeyType="next"
             />
 
-            <TextInput
-              style={styles.input}
+            <RegistrationField
+              label="Correo electrónico"
               placeholder="Correo electrónico"
               value={email}
               onChangeText={setEmail}
@@ -82,8 +123,8 @@ export default function RegisterScreen({ navigation }: any) {
               returnKeyType="next"
             />
 
-            <TextInput
-              style={styles.input}
+            <RegistrationField
+              label="Contraseña"
               placeholder="Contraseña"
               value={password}
               onChangeText={setPassword}
@@ -91,8 +132,8 @@ export default function RegisterScreen({ navigation }: any) {
               returnKeyType="next"
             />
 
-            <TextInput
-              style={styles.input}
+            <RegistrationField
+              label="Confirmar contraseña"
               placeholder="Confirmar contraseña"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
@@ -101,11 +142,11 @@ export default function RegisterScreen({ navigation }: any) {
               onSubmitEditing={handleRegister}
             />
 
-            <TouchableOpacity style={styles.button} onPress={handleRegister}>
-              <Text style={styles.buttonText}>Crear cuenta</Text>
+            <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crear cuenta</Text>}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
+            <TouchableOpacity style={styles.linkButton} disabled={loading} onPress={() => navigation.navigate('Login', route.params)}>
               <Text style={styles.linkText}>¿Ya tenés cuenta? Iniciá sesión</Text>
             </TouchableOpacity>
           </FadeInView>
@@ -135,14 +176,43 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   form: {
-    gap: 16,
-    marginTop: 22, padding: 20, borderRadius: 24, backgroundColor: 'rgba(255,255,255,.72)', borderWidth: 1, borderColor: '#fff', ...shadow,
+    marginTop: 22,
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#C7D7EB',
+    ...shadow,
+  },
+  separator: { color: colors.muted, fontSize: 12, textAlign: 'center', marginVertical: 18 },
+  field: {
+    marginBottom: 18,
+  },
+  label: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  inputWrap: {
+    minHeight: 56,
+    backgroundColor: '#EDF3FB',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.muted,
+  },
+  inputWrapFocused: {
+    borderColor: colors.primary,
+    backgroundColor: '#E3EEFF',
   },
   input: {
-    backgroundColor: 'rgba(255,255,255,.78)',
-    padding: 15,
-    borderRadius: 16, borderWidth: 1, borderColor: '#fff',
+    backgroundColor: 'transparent',
+    color: colors.ink,
+    minHeight: 52,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     fontSize: 16,
+    lineHeight: 22,
   },
   button: {
     backgroundColor: colors.primary,
@@ -157,6 +227,7 @@ const styles = StyleSheet.create({
   },
   linkButton: {
     alignItems: 'center',
+    marginTop: 12,
     padding: 10,
   },
   linkText: {

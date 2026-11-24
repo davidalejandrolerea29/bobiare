@@ -12,3 +12,4 @@ eas build --profile production --platform android
 
 eas build --profile development --platform android
 ```
+export $(grep -v '^#' .env | xargs) && eas build --profile preview --platform android

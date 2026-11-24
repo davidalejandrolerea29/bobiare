@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { useAuthState } from '../utils/authState';
-import { attachPushListeners, syncGrantedPush } from '../utils/pushNotifications';
+import { attachPushListeners, retryPendingPushRemoval, syncGrantedPush } from '../utils/pushNotifications';
 import { clearPendingPushNavigation, flushPushNavigation, openOrderFromPush } from '../utils/pushNavigation';
 import { getAuthState } from '../utils/authState';
 import Toast from '../utils/notify';
@@ -13,16 +14,17 @@ export default function PushCoordinator() {
     let stop: (() => void) | null = null;
     void attachPushListeners(
       message => {
-        if (getAuthState() !== true) return;
+        if (cancelled || getAuthState() !== true) return;
         const orderId = message.data?.order_id;
         Toast.show({
           type: 'info',
           text1: message.notification?.title || 'BOBIARE',
           text2: message.notification?.body || 'Tenés una novedad en tu pedido.',
+          visibilityTime: 6000,
           onPress: () => openOrderFromPush(orderId),
         });
       },
-      message => openOrderFromPush(message.data?.order_id),
+      message => { if (!cancelled) openOrderFromPush(message.data?.order_id); },
     ).then(unsubscribe => {
       if (cancelled) unsubscribe(); else stop = unsubscribe;
     }).catch(() => {});
@@ -30,7 +32,10 @@ export default function PushCoordinator() {
   }, []);
 
   useEffect(() => {
-    if (authenticated === false) clearPendingPushNavigation();
+    if (authenticated === false) {
+      clearPendingPushNavigation();
+      void retryPendingPushRemoval().catch(() => {});
+    }
     if (authenticated === true) {
       void syncGrantedPush().catch(() => {});
       // El reset de Launch/Login puede terminar un instante después de autenticar.
@@ -38,6 +43,16 @@ export default function PushCoordinator() {
       return () => clearTimeout(timer);
     }
   }, [authenticated]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') return;
+      if (getAuthState() === true) void syncGrantedPush().catch(() => {});
+      else void retryPendingPushRemoval().catch(() => {});
+      flushPushNavigation();
+    });
+    return () => subscription.remove();
+  }, []);
 
   return null;
 }

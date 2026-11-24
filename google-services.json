@@ -12,7 +12,20 @@
           "package_name": "com.bobiare"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "57684984879-fmg6530un6kd96ecvk1apo9edh38q633.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bobiare",
+            "certificate_hash": "20836df272da4cbd3e51c281408890c41fc0be2f"
+          }
+        },
+        {
+          "client_id": "57684984879-e2jkoidanv5ju0j4anutqtkld4o02n2v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBpI4MswUXb2sRGElGPAnSqFgRcjDSPQ6c"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "57684984879-e2jkoidanv5ju0j4anutqtkld4o02n2v.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "57684984879-n56ffndsdrchlbd0st243djq4934rva3.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.bobiare"
+              }
+            }
+          ]
         }
       }
     }

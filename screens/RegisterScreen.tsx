@@ -8,6 +8,8 @@ import { colors, shadow } from '../theme';
 import { getErrorMessage, register } from '../utils/api';
 import { FadeInView, SoftAppear } from '../components/MotionUI';
 import GoogleSignInButton from '../components/GoogleSignInButton';
+import AppleSignInButton from '../components/AppleSignInButton';
+import { LEGAL_URLS, openExternalUrl } from '../utils/legal';
 import { finishLogin } from '../utils/authNavigation';
 import type { RootStackParamList } from '../types/types';
 
@@ -103,6 +105,7 @@ export default function RegisterScreen({ navigation, route }: {
           </SoftAppear>
 
           <FadeInView style={styles.form}>
+            <AppleSignInButton mode="signUp" disabled={loading} pendingRef={pending} onLoadingChange={setLoading} onAuthenticated={user => finishLogin(navigation, user, route.params?.returnToCheckout)} />
             <GoogleSignInButton disabled={loading} pendingRef={pending} onLoadingChange={setLoading} onAuthenticated={user => finishLogin(navigation, user, route.params?.returnToCheckout)} />
             <Text style={styles.separator}>O registrate con tu correo</Text>
             <RegistrationField
@@ -146,6 +149,13 @@ export default function RegisterScreen({ navigation, route }: {
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crear cuenta</Text>}
             </TouchableOpacity>
 
+            <Text style={styles.legal}>
+              Al crear tu cuenta aceptás los{' '}
+              <Text style={styles.legalLink} accessibilityRole="link" onPress={() => openExternalUrl(LEGAL_URLS.terms)}>Términos y condiciones</Text>
+              {' '}y la{' '}
+              <Text style={styles.legalLink} accessibilityRole="link" onPress={() => openExternalUrl(LEGAL_URLS.privacy)}>Política de privacidad</Text>.
+            </Text>
+
             <TouchableOpacity style={styles.linkButton} disabled={loading} onPress={() => navigation.navigate('Login', route.params)}>
               <Text style={styles.linkText}>¿Ya tenés cuenta? Iniciá sesión</Text>
             </TouchableOpacity>
@@ -157,6 +167,8 @@ export default function RegisterScreen({ navigation, route }: {
 }
 
 const styles = StyleSheet.create({
+  legal: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 14 },
+  legalLink: { color: colors.primary, fontWeight: '700' },
   keyboard: {
     flex: 1,
   },

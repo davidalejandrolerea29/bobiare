@@ -515,6 +515,56 @@ export async function loginWithGoogle(firebaseIdToken: string) {
   return authenticate(GOOGLE_AUTH_PATH, { id_token: firebaseIdToken.trim() }, true);
 }
 
+export async function loginWithApple(identityToken: string, rawNonce: string, fullName?: string) {
+  if (typeof identityToken !== 'string' || !identityToken.trim()) {
+    throw new Error('Apple no devolvió una credencial válida. Intentá nuevamente.');
+  }
+  // El backend verifica el identity token contra las claves públicas de Apple.
+  return authenticate('/auth/apple', {
+    identity_token: identityToken.trim(),
+    nonce: rawNonce,
+    ...(fullName ? { full_name: fullName } : {}),
+  }, true);
+}
+
+export async function requestPasswordReset(email: string) {
+  const { data } = await authApi.post('/auth/password/forgot', { email: email.trim().toLowerCase() });
+  return data as { message?: string };
+}
+
+export async function resetPassword(email: string, code: string, password: string) {
+  const { data } = await authApi.post('/auth/password/reset', {
+    email: email.trim().toLowerCase(),
+    code: code.trim(),
+    password,
+    password_confirmation: password,
+  });
+  return data as { message?: string };
+}
+
+/**
+ * Baja definitiva de la cuenta (App Store 5.1.1(v)). El servidor anonimiza la
+ * cuenta e invalida el token; acá solo se limpia la sesión local.
+ */
+export async function deleteAccount() {
+  await api.delete('/auth/account');
+  try {
+    const { clearPendingPushNavigation } = require('./pushNavigation') as typeof import('./pushNavigation');
+    clearPendingPushNavigation();
+  } catch {
+    // Sin navegación push pendiente.
+  }
+  await AsyncStorage.multiRemove([STORAGE_KEYS.accessToken, STORAGE_KEYS.tokenExpiresAt, STORAGE_KEYS.user, STORAGE_KEYS.guestToken]);
+  setAuthState(false);
+  try {
+    // El servidor ya borró los registros push; acá se invalida el token FCM local.
+    const { removePushRegistrationForLogout } = require('./pushNotifications') as typeof import('./pushNotifications');
+    await removePushRegistrationForLogout();
+  } catch {
+    // La cuenta ya fue eliminada aunque el dispositivo no tenga conexión con FCM.
+  }
+}
+
 export async function register(name: string, email: string, password: string) {
   const { data } = await api.post('/auth/register', { name, email, password });
   return data;

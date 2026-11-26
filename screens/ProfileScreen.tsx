@@ -7,7 +7,9 @@ import { AppBackground, GlassCard } from '../components/GlassUI';
 import BottomNav from '../components/BottomNav';
 import { colors } from '../theme';
 import { ApiUser } from '../types/types';
-import { getCurrentUser, getErrorMessage, getStoredUser, logout } from '../utils/api';
+import Constants from 'expo-constants';
+import { deleteAccount, getCurrentUser, getErrorMessage, getStoredUser, logout } from '../utils/api';
+import { LEGAL_URLS, openExternalUrl, supportWhatsAppUrl } from '../utils/legal';
 import { activatePush, deactivatePush, pushStatus, subscribePushStatus } from '../utils/pushNotifications';
 import { FadeInView, ListSkeleton } from '../components/MotionUI';
 
@@ -129,6 +131,31 @@ export default function ProfileScreen({ navigation }: any) {
     navigation.reset({ index: 0, routes: [{ name: 'Catalog' }] });
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const runDeleteAccount = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      Toast.show({ type: 'success', text1: 'Tu cuenta fue eliminada' });
+      navigation.reset({ index: 0, routes: [{ name: 'Catalog' }] });
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'No pudimos eliminar tu cuenta', text2: getErrorMessage(error) });
+    } finally {
+      if (mounted.current) setDeleting(false);
+    }
+  };
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Eliminar cuenta',
+      'Se borrarán tu nombre, correo, contraseña y accesos con Google o Apple, y se cerrará tu sesión. Los pedidos y facturas ya emitidos se conservan por obligación fiscal. Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: () => { void runDeleteAccount(); } },
+      ],
+    );
+  };
+
   const role = typeof user?.role === 'string' ? user.role : user?.role?.name;
   const phone = user?.phone || user?.telefono;
   const verified = Boolean(user?.email_verified_at || user?.verified || user?.is_verified);
@@ -159,15 +186,27 @@ export default function ProfileScreen({ navigation }: any) {
           </View>;
         })}</View></FadeInView>
       </>}
-      <TouchableOpacity style={styles.whatsapp} onPress={() => Linking.openURL('https://wa.me/5493510000000?text=Hola,%20necesito%20ayuda%20con%20Bobiare')}><Icon name="whatsapp" size={25} color="#fff"/><View style={styles.helpCopy}><Text style={styles.whatsappTitle}>¿Necesitás ayuda?</Text><Text style={styles.whatsappNote}>Hablemos por WhatsApp</Text></View><Icon name="arrow-top-right" size={20} color="#fff"/></TouchableOpacity>
-      <TouchableOpacity style={styles.logout} onPress={handleLogout}><Icon name="logout" size={19} color={colors.danger}/><Text style={styles.logoutText}>Cerrar sesión</Text></TouchableOpacity>
-      <Text style={styles.version}>Bobiare · versión 1.0.0</Text>
+      <TouchableOpacity style={styles.whatsapp} onPress={() => openExternalUrl(supportWhatsAppUrl())}><Icon name="whatsapp" size={25} color="#fff"/><View style={styles.helpCopy}><Text style={styles.whatsappTitle}>¿Necesitás ayuda?</Text><Text style={styles.whatsappNote}>Hablemos por WhatsApp</Text></View><Icon name="arrow-top-right" size={20} color="#fff"/></TouchableOpacity>
+      <View style={styles.legalRow}>
+        <TouchableOpacity accessibilityRole="link" onPress={() => openExternalUrl(LEGAL_URLS.privacy)}><Text style={styles.legalLink}>Política de privacidad</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="link" onPress={() => openExternalUrl(LEGAL_URLS.terms)}><Text style={styles.legalLink}>Términos y condiciones</Text></TouchableOpacity>
+      </View>
+      <TouchableOpacity style={styles.logout} onPress={handleLogout} disabled={deleting}><Icon name="logout" size={19} color={colors.danger}/><Text style={styles.logoutText}>Cerrar sesión</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" style={styles.deleteAccount} onPress={confirmDeleteAccount} disabled={deleting}>
+        {deleting ? <ActivityIndicator size="small" color={colors.danger}/> : <Icon name="account-remove-outline" size={18} color={colors.danger}/>}
+        <Text style={styles.deleteAccountText}>Eliminar cuenta</Text>
+      </TouchableOpacity>
+      <Text style={styles.version}>Bobiare · versión {Constants.expoConfig?.version || '1.0.1'}</Text>
     </ScrollView>
     <BottomNav active="Profile" />
   </AppBackground>;
 }
 
 const styles = StyleSheet.create({
+  legalRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 18, marginTop: 20 },
+  legalLink: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  deleteAccount: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, marginTop: 16, paddingVertical: 6 },
+  deleteAccountText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
   content: { padding: 20, paddingTop: 30, paddingBottom: 110 }, eyebrow: { fontSize: 11, color: colors.primary, fontWeight: '900', letterSpacing: 1.5 }, title: { fontSize: 30, fontWeight: '900', color: colors.ink, letterSpacing: -1, marginTop: 4 }, loader: { marginTop: 45 },
   user: { padding: 18, marginTop: 21, flexDirection: 'row', alignItems: 'center' }, avatar: { width: 66, height: 66, borderRadius: 23, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }, initials: { color: '#fff', fontSize: 21, fontWeight: '900' },
   userText: { flex: 1, marginLeft: 14 }, name: { fontSize: 18, fontWeight: '900', color: colors.ink }, email: { color: colors.muted, fontSize: 13, marginTop: 3 }, verified: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }, verifiedText: { color: colors.primary, fontSize: 11, fontWeight: '700' },

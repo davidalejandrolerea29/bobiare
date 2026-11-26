@@ -9,6 +9,8 @@ import { colors, shadow } from '../theme';
 import { getErrorMessage, login } from '../utils/api';
 import { FadeInView, SoftAppear } from '../components/MotionUI';
 import GoogleSignInButton from '../components/GoogleSignInButton';
+import AppleSignInButton from '../components/AppleSignInButton';
+import { LEGAL_URLS, openExternalUrl } from '../utils/legal';
 import { finishLogin } from '../utils/authNavigation';
 
 export default function LoginScreen({ navigation, route }: { navigation: NavigationProp<RootStackParamList>; route: RouteProp<RootStackParamList, 'Login'> }) {
@@ -46,11 +48,13 @@ export default function LoginScreen({ navigation, route }: { navigation: Navigat
       <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}><Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text></TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>{loading ? <ActivityIndicator color="#fff"/> : <><Text style={styles.buttonText}>Ingresar</Text><Icon name="arrow-right" size={20} color="#fff"/></>}</TouchableOpacity>
       <View style={styles.divider}><View style={styles.line}/><Text style={styles.or}>O</Text><View style={styles.line}/></View>
+      <AppleSignInButton disabled={loading} pendingRef={pending} onLoadingChange={setLoading} onAuthenticated={user => finishLogin(navigation, user, route.params?.returnToCheckout)} />
       <GoogleSignInButton disabled={loading} pendingRef={pending} onLoadingChange={setLoading} onAuthenticated={user => finishLogin(navigation, user, route.params?.returnToCheckout)} />
       <TouchableOpacity style={[styles.register, styles.registerSpacing]} disabled={loading} onPress={() => navigation.navigate('Register', route.params)}><Text style={styles.registerText}>Crear una cuenta</Text></TouchableOpacity>
       <TouchableOpacity style={styles.adminDemo} onPress={() => navigation.navigate('Catalog')}><Icon name="view-grid-outline" size={16} color={colors.muted}/><Text style={styles.adminDemoText}>Ver catálogo sin iniciar sesión</Text></TouchableOpacity>
     </GlassCard></FadeInView>
     <FadeInView index={1} style={styles.trust}><Icon name="shield-check-outline" size={17} color={colors.primary}/><Text style={styles.trustText}>Tus datos y pedidos están protegidos</Text></FadeInView>
+    <View style={styles.legalRow}><Text style={styles.legalLink} accessibilityRole="link" onPress={() => openExternalUrl(LEGAL_URLS.privacy)}>Privacidad</Text><Text style={styles.trustText}>·</Text><Text style={styles.legalLink} accessibilityRole="link" onPress={() => openExternalUrl(LEGAL_URLS.terms)}>Términos</Text></View>
   </ScrollView></KeyboardAvoidingView></AppBackground>;
 }
 
@@ -70,5 +74,6 @@ const styles = StyleSheet.create({
   register: { height: 53, borderRadius: 17, borderWidth: 1, borderColor: 'rgba(18,103,233,.25)', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,.52)' }, registerText: { color: colors.primary, fontWeight: '900' },
   registerSpacing: { marginTop: 12 },
   adminDemo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 15 }, adminDemoText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  legalRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 10 }, legalLink: { color: colors.primary, fontSize: 11, fontWeight: '700' },
   trust: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 18 }, trustText: { color: colors.muted, fontSize: 11 },
 });
